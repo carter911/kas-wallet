@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 定义变量
-REPO_DIR="/www/wwwroot/kas-mint/delopy"
+REPO_DIR="/www/wwwroot/kas-mint"
 WWW_DIR="/www/wwwroot/kas-mint/www"
 APP_NAME="kas-mint"
 TS_CONFIG="tsconfig.json"
