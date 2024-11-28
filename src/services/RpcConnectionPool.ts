@@ -18,7 +18,6 @@ class RpcConnectionPool {
             this.pool.push(connection);
         }
     }
-
     // 获取一个可用连接（轮询分配）
     public async getConnection(): Promise<RpcConnection> {
         const connection = this.pool[this.currentIndex];
