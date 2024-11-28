@@ -1,48 +1,52 @@
 #!/bin/bash
 
-# 变量定义
+# 定义变量
+REPO_DIR="/www/wwwroot/kas-mint/delopy"
+WWW_DIR="/www/wwwroot/kas-mint/www"
 APP_NAME="kas-mint"
 TS_CONFIG="tsconfig.json"
-BUILD_DIR="dist"
-SRC_DIR="src"
-ENTRY_FILE="dist/app.js"
-NODE_ENV="production"
 
-# 确保脚本失败时停止执行
-set -e
+echo "开始检查代码更新..."
 
-echo "开始部署 TypeScript + Express 项目..."
+# 进入项目目录
+cd "$REPO_DIR" || { echo "目录 $REPO_DIR 不存在"; exit 1; }
 
-# 安装依赖
-echo "安装依赖..."
-npm install
+# 获取最新代码信息
+git fetch origin main
 
-# 编译 TypeScript
-echo "编译 TypeScript 项目..."
-npx tsc -p $TS_CONFIG
+# 检查是否有更新
+LOCAL_HASH=$(git rev-parse HEAD)
+REMOTE_HASH=$(git rev-parse origin/main)
 
-# 检查编译是否成功
-if [ ! -d "$BUILD_DIR" ]; then
-  echo "编译失败：找不到 $BUILD_DIR 目录。"
-  exit 1
+if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
+    echo "检测到代码更新，开始拉取并部署..."
+
+    # 拉取代码
+    git pull origin main || { echo "Git 拉取失败"; exit 1; }
+
+    # 安装依赖
+    echo "安装依赖..."
+    npm install || { echo "依赖安装失败"; exit 1; }
+
+    # 编译 TypeScript 项目
+    echo "编译 TypeScript..."
+    npx tsc -p "$TS_CONFIG" || { echo "TypeScript 编译失败"; exit 1; }
+
+    # 复制 Library 文件夹到 dist
+    if [ -d "src/Library" ]; then
+        echo "复制 Library 文件夹到 dist..."
+        cp -r src/Library dist/Library || { echo "Library 文件夹复制失败"; exit 1; }
+    fi
+
+    # 同步到生产目录
+    echo "同步代码到生产目录..."
+    rsync -a --delete "$REPO_DIR/" "$WWW_DIR/" || { echo "代码同步失败"; exit 1; }
+
+    # 重启 PM2 应用
+    echo "重启 PM2 应用..."
+    pm2 restart "$APP_NAME" || { echo "PM2 重启失败"; exit 1; }
+
+    echo "部署完成！"
+else
+    echo "没有检测到更新，无需操作。"
 fi
-
-# 将 src/Library 复制到 dist/Library
-if [ -d "$SRC_DIR/Library" ]; then
-  echo "复制 Library 文件夹到 dist..."
-  cp -r $SRC_DIR/Library $BUILD_DIR/Library
-fi
-
-# 使用 PM2 启动应用
-echo "启动 PM2 管理服务..."
-pm2 start $ENTRY_FILE --name $APP_NAME --env $NODE_ENV
-
-# 保存当前的 PM2 配置
-echo "保存 PM2 运行状态..."
-pm2 save
-
-# 确保 PM2 在系统重启时自启动
-echo "设置 PM2 为自启动..."
-pm2 startup
-
-echo "部署完成！应用 $APP_NAME 已在 PM2 中运行。"
