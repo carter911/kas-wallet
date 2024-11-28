@@ -25,6 +25,12 @@ if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
     # 拉取代码
     git pull origin main || { echo "Git 拉取失败"; exit 1; }
 
+    # 复制 Library 文件夹到 dist
+    if [ -d "src/Library" ]; then
+        echo "复制 Library 文件夹到 dist..."
+        cp -r src/Library dist/Library || { echo "Library 文件夹复制失败"; exit 1; }
+    fi
+
     # 安装依赖
     echo "安装依赖..."
     npm install || { echo "依赖安装失败"; exit 1; }
@@ -32,12 +38,6 @@ if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
     # 编译 TypeScript 项目
     echo "编译 TypeScript..."
     npx tsc -p "$TS_CONFIG" || { echo "TypeScript 编译失败"; exit 1; }
-
-    # 复制 Library 文件夹到 dist
-    if [ -d "src/Library" ]; then
-        echo "复制 Library 文件夹到 dist..."
-        cp -r src/Library dist/Library || { echo "Library 文件夹复制失败"; exit 1; }
-    fi
 
     # 同步到生产目录
     echo "同步代码到生产目录..."
