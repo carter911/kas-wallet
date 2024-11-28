@@ -2,7 +2,7 @@
 
 # 定义变量
 REPO_DIR="/www/wwwroot/kas-mint"
-WWW_DIR="/www/wwwroot/kas-mint/www"
+WWW_DIR="/www/wwwroot/kas-mint"
 APP_NAME="kas-mint"
 TS_CONFIG="tsconfig.json"
 
