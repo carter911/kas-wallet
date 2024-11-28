@@ -21,6 +21,7 @@ REMOTE_HASH=$(git rev-parse origin/main)
 if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
     echo "检测到代码更新，开始拉取并部署..."
 
+    git stash
     # 拉取代码
     git pull origin main || { echo "Git 拉取失败"; exit 1; }
 
