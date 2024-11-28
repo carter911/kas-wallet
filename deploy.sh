@@ -4,6 +4,7 @@
 APP_NAME="kas-mint"
 TS_CONFIG="tsconfig.json"
 BUILD_DIR="dist"
+SRC_DIR="src"
 ENTRY_FILE="dist/app.js"
 NODE_ENV="production"
 
@@ -24,6 +25,12 @@ npx tsc -p $TS_CONFIG
 if [ ! -d "$BUILD_DIR" ]; then
   echo "编译失败：找不到 $BUILD_DIR 目录。"
   exit 1
+fi
+
+# 将 src/Library 复制到 dist/Library
+if [ -d "$SRC_DIR/Library" ]; then
+  echo "复制 Library 文件夹到 dist..."
+  cp -r $SRC_DIR/Library $BUILD_DIR/Library
 fi
 
 # 使用 PM2 启动应用
