@@ -1,0 +1,12 @@
+# 忽略 Node.js 的依赖文件夹
+node_modules/
+
+# 忽略日志文件
+*.log
+
+# 忽略操作系统生成的文件
+.DS_Store
+Thumbs.db
+
+# 忽略环境配置文件
+.env
