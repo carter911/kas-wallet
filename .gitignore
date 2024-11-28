@@ -1,5 +1,6 @@
 # 忽略 Node.js 的依赖文件夹
 node_modules/
+dist/*
 
 # 忽略日志文件
 *.log
