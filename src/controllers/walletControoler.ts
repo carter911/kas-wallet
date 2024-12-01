@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
 import Wallet from '../services/Wallet';
 import Keys from '../services/Keys';
-import rpcPool from '../app';
 import Krc from '../services/Krc';
+import rpcPool from "../app";
 //  获取钱包地址
 export async function generateAddress(req: Request, res: Response): Promise<void> {
-    const { network,password } = req.query;
-
+    const { network,password } = req.body;
+    console.log(network,password);
     if (!network || typeof network !== 'string') {
         console.warn('Network is undefined, using default network.');
         res.status(401).json({ error: 'Network is undefined, using default network.' });
@@ -46,9 +46,7 @@ export async function importAddress(req: Request, res: Response): Promise<void> 
 }
 
 export async function balance(req: Request, res: Response): Promise<void> {
-    const { network,privateKey,rpcUrl } = req.body;
-
-    console.log(rpcUrl)
+    const { network,privateKey } = req.body;
     if (!network) {
         console.warn('Network is undefined, using default network.');
         res.status(401).json({ error: 'Network is undefined, using default network.' });
@@ -58,6 +56,7 @@ export async function balance(req: Request, res: Response): Promise<void> {
         res.status(401).json({ error: 'privateKey is undefined, using default network.' });
     }
 
+    console.log(network,privateKey);
     try {
         const connection = await rpcPool.getConnection();
         const wallet = new Wallet(privateKey.toString(),network.toString(),connection);

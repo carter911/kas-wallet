@@ -9,17 +9,19 @@ import {
     signTransaction,
     createInputSignature,
 } from '../Library/wasm/kaspa';
-import rpcPool from "../app";
 import Wallet from "./Wallet";
 import RpcConnection from "./RpcConnection";
+import rpcPool from "../app";
+//import Redis from "ioredis";
 type ItemType = {
     address: string;
     script: ScriptBuilder;
     publicKey: string;
 };
 // 初始化 Redis 连接
-const redisOptions:any = { host: '127.0.0.1', port: 6379 ,password:'chenrj123'};
+const redisOptions:any = { host: '127.0.0.1', port: 6379 ,password:''};
 const taskQueue = new Bull('taskQueue', redisOptions);
+//const redis = new Redis(redisOptions);
 // const u64MaxValue = 18446744073709551615;
 
 // 日志函数
@@ -176,10 +178,11 @@ async function cancelTask(taskId: string) {
 
 // 任务处理器
 taskQueue.process(async (job) => {
-    const { privateKey, ticker, gasFee, amount,walletNumber, timeout} = job.data;
+    const { privateKey, ticker, gasFee, amount,walletNumber,network} = job.data;
+    //redis.hset("task_status",job.id,job.data);
     try {
         log(`Starting task with data: ${JSON.stringify(job.data)}`, 'INFO');
-        const taskResult = await submitTask(privateKey, ticker, gasFee, amount,walletNumber, timeout);
+        const taskResult = await submitTask(privateKey, ticker, gasFee, amount,walletNumber,network);
         return taskResult;
     } catch (error) {
         log(`Error processing task: ${error}`, 'ERROR');

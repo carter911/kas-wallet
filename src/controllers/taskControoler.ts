@@ -6,13 +6,14 @@ import rpcPool from "../app";
 
 // 提交任务的控制器
 export async function submitForm(req: Request, res: Response): Promise<void> {
-    const { privateKey, ticker, gasFee, amount,walletNumber, timeout, network } = req.body;
+    const { privateKey, ticker, gasFee, amount,walletNumber, network } = req.body;
     console.log('--------------------->',req.body);
     try {
         const connection = await rpcPool.getConnection();
         const wallet = new Wallet(privateKey.toString(),network.toString(),connection);
         const address = wallet.getAddress();
         const balance = await wallet.getBalance();
+        console.log(balance);
         if(parseFloat(balance)<(amount+gasFee)*walletNumber){
             res.status(400).json({ error: address+' :Insufficient balance' });
             return;
@@ -25,7 +26,6 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
             gasFee,
             walletNumber,
             amount,
-            timeout,
             network,
             total:amount*walletNumber,
             current:0,
