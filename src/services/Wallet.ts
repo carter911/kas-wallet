@@ -4,7 +4,12 @@ import {
     kaspaToSompi,
     sompiToKaspaString,
     IPaymentOutput,
-    ScriptBuilder, createTransaction, createInputSignature, SighashType, Opcodes, addressFromScriptPublicKey
+    ScriptBuilder,
+    createTransaction,
+    createInputSignature,
+    SighashType,
+    Opcodes,
+    addressFromScriptPublicKey
 } from '../Library/wasm/kaspa';
 import RpcConnection from './RpcConnection';
 type ItemType = {
@@ -72,12 +77,12 @@ class Wallet {
     }
 
     // Send KAS
-    async send(destination: string, amount: number, gasFee: number=0.00002) {
+    async send(toAddress: string, amount: number, gasFee: number=0.00002) {
         const RPC = await this.RpcConnection.getRpcClient();
         const address = this.getAddress();
         const UTXO = await RPC.getUtxosByAddresses({ addresses: [address.toString()] });
         const output: IPaymentOutput = {
-            address: destination,
+            address: toAddress,
             amount: kaspaToSompi(amount.toString())!
         };
         const { transactions: transactions } = await createTransactions({
@@ -87,6 +92,7 @@ class Wallet {
             priorityFee: kaspaToSompi(gasFee.toString())!,
             networkId: this.network
         });
+
         let hash: any;
         for (const transaction of transactions) {
             transaction.sign([this.privateKeyObj], false);

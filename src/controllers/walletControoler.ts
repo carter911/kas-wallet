@@ -59,6 +59,14 @@ export async function balance(req: Request, res: Response): Promise<void> {
     console.log(network,privateKey);
     try {
         const connection = await rpcPool.getConnection();
+        const RPC = await connection.getRpcClient();
+        const request = {
+            //txSize: 300,      // 交易大小，单位字节
+            numInputs: 1,     // 输入数量
+            numOutputs: 1     // 输出数量
+        };
+        const fee = await RPC.getFeeEstimate(request);
+        console.log(fee?.estimate);
         const wallet = new Wallet(privateKey.toString(),network.toString(),connection);
         const address = wallet.getAddress();
         const balance = await wallet.getBalance();

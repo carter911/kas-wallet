@@ -85,9 +85,8 @@ class RpcConnection {
 
             // 监听 UTXO 变化
             this.rpcClient.addEventListener('utxos-changed', async (event: any) => {
-                log(`UTXO changes detected for address: ${address}`, 'INFO');
+                //log(`UTXO changes detected for address: ${address}`, 'INFO');
                 const addressPayload = address.split(':')[1]; // Assuming address format is <network>:<address>
-
                 const addedEntry = event.data.added.find((entry: any) => entry.address.payload === addressPayload);
                 const removedEntry = event.data.removed.find((entry: any) => entry.address.payload === addressPayload);
 

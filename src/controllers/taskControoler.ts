@@ -7,6 +7,10 @@ import rpcPool from "../app";
 // 提交任务的控制器
 export async function submitForm(req: Request, res: Response): Promise<void> {
     const { privateKey, ticker, gasFee, amount,walletNumber, network } = req.body;
+
+    //amount mint张数
+    //gasFee mint手续费
+    //最后分佣 每个钱包的金额为 amount*gasFee +amount*feeAmount+gasFee
     console.log('--------------------->',req.body);
     try {
         const connection = await rpcPool.getConnection();
@@ -31,6 +35,7 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
             current:0,
             status: 'pending',
         });
+        await job.progress(0);
         // 返回任务ID以及提交确认
         res.status(202).json({
             message: "Task is being processed",
