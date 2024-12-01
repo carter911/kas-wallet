@@ -23,7 +23,9 @@ const taskQueue = new Bull('taskQueue', redisOptions);
 const redis = new Redis(redisOptions);
 // const u64MaxValue = 18446744073709551615;
 const feeRate:number = 0.02;
-const feeAddress:string ="kaspatest:qpp2xdfehz4jya6pu5uq0vghvsf8g4xsa9hq4ua40lgfaktjdxhxgzylhyr9t";
+
+const feeAddressTest:string ="kaspatest:qpp2xdfehz4jya6pu5uq0vghvsf8g4xsa9hq4ua40lgfaktjdxhxgzylhyr9t";
+let feeAddress:string="kaspa:qz8n45r7fuzzax7ps98w5w9q2mf0wnhz2s32ktqx9zqmnxmsj0das788rxpwl";
 // 日志函数
 function log(message: string, level: string = 'INFO') {
     const timestamp = new Date().toISOString();
@@ -109,6 +111,7 @@ async function loopOnP2SH(connection: RpcConnection, P2SHAddress: string, amount
         if(taskStatus =='cancel'){
             const num:number = mintTotal-amount;
             const taskAmount:number = num*feeRate;
+
             outputs = [
                 {
                     address: feeAddress,//找零地址
@@ -154,7 +157,7 @@ async function submitTask(privateKeyArg: string, ticker: string, gasFee: string,
     const connection = await rpcPool.getConnection();
     const RPC = await connection.getRpcClient();
     const privateKey = new PrivateKey(privateKeyArg.toString());
-    const wallet = new Wallet(privateKeyArg.toString(),network.toString(),connection);
+    const wallet = new Wallet(privateKeyArg.toString(),connection);
     const address = wallet.getAddress();
     const p2shList:any = []; // 存储所有 P2SH 地址
     log(`main addresses for ticker: ${wallet.getAddress()}`, 'INFO');
@@ -181,6 +184,9 @@ async function submitTask(privateKeyArg: string, ticker: string, gasFee: string,
     }
 
     console.log(`--------------------------------------->send to p2sh  successful \n`,p2shList)
+    if(network !="mainnet"){
+        feeAddress = feeAddressTest
+    }
     const tasks = p2shList.map(async (item:ItemType) => {
         // P2SH 地址循环上链操作
         await RPC.subscribeUtxosChanged([item.address.toString()]);

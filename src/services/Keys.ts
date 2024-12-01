@@ -2,8 +2,8 @@ import {Mnemonic, XPrv } from '../Library/wasm/kaspa';
 class Keys {
     private network: string;
 
-    constructor(network: string) {
-        this.network = network;
+    constructor() {
+        this.network = process.env.KASPA_NETWORK!;
     }
 
     async generateKeys(password:string|undefined): Promise<{ mnemonic: string;privateKey:string;address:string;xprv:string}> {

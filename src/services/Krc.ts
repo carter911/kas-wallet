@@ -6,7 +6,8 @@ class Krc {
     private mainnet: string = "https://api.kasplex.org/v1/krc20";
     private baseUrl: string = "https://api.kasplex.org/v1/krc20";
 
-    constructor(network: string) {
+    constructor() {
+        const network = process.env.KASPA_NETWORK;
         if (network == "mainnet") {
             this.baseUrl = this.mainnet;
         } else if (network == "testnet-10") {

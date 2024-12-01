@@ -18,13 +18,13 @@ function log(message: string, level: string = 'INFO') {
 class RpcConnection {
     private rpcClient: RpcClient;
 
-    constructor(private network: string, url: string = '') {
+    constructor() {
         // 初始化 RPC 客户端
         this.rpcClient = new RpcClient({
-            url: url || undefined,
+            url: process.env.KASPA_NODE || undefined,
             resolver: new Resolver(),
             encoding: Encoding.Borsh,
-            networkId: this.network,
+            networkId: process.env.KASPA_NETWORK,
         });
     }
 

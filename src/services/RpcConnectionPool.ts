@@ -4,15 +4,15 @@ import RpcConnection from './RpcConnection';
 class RpcConnectionPool {
     private pool: RpcConnection[] = [];
     private size: number;
-    private network: string;
-    private url: string;
+    //private network: string;
+    //private url: string;
     private maxSize: number;
 
-    constructor(size: number, maxSize: number, network: string, url: string) {
+    constructor(size: number, maxSize: number) {
         this.size = size;
         this.maxSize = maxSize;
-        this.network = network;
-        this.url = url;
+        //this.network = network;
+        //this.url = url;
 
         // 初始化连接池
         this.initializePool();
@@ -21,7 +21,7 @@ class RpcConnectionPool {
     // 初始化连接池，创建指定数量的连接
     private initializePool() {
         for (let i = 0; i < this.size; i++) {
-            const connection = new RpcConnection(this.network, this.url);
+            const connection = new RpcConnection();
             this.pool.push(connection);
         }
     }
@@ -53,7 +53,7 @@ class RpcConnectionPool {
     // 动态扩展连接池（最大连接数控制）
     public expandPool(): void {
         if (this.pool.length < this.maxSize) {
-            const newConnection = new RpcConnection(this.network, this.url);
+            const newConnection = new RpcConnection();
             this.pool.push(newConnection);
             console.log(`Expanded pool size. Current pool size: ${this.pool.length}`);
         } else {

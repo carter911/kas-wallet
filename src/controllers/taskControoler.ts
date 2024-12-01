@@ -14,7 +14,7 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
     console.log('--------------------->',req.body);
     try {
         const connection = await rpcPool.getConnection();
-        const wallet = new Wallet(privateKey.toString(),network.toString(),connection);
+        const wallet = new Wallet(privateKey.toString(),connection);
         const address = wallet.getAddress();
         const balance = await wallet.getBalance();
         console.log(balance);

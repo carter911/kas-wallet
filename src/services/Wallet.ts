@@ -22,9 +22,9 @@ class Wallet {
     private network: string;
     private RpcConnection:RpcConnection;
 
-    constructor(privateKey: string, network: string,RpcConnection:RpcConnection) {
+    constructor(privateKey: string, RpcConnection:RpcConnection) {
         this.privateKeyObj = new PrivateKey(privateKey);
-        this.network = network;
+        this.network = process.env.KASPA_NETWORK!;
         this.RpcConnection = RpcConnection;
     }
 
