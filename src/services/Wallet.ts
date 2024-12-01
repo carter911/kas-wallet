@@ -207,7 +207,7 @@ class Wallet {
         try {
             const MAX_RETRIES = 20; // 最大重试次数
             const index =1;
-            if(address ==undefined){
+            if(address ==undefined || address==""){
                 address = this.getAddress();
             }
             const RPC = await this.RpcConnection.getRpcClient();

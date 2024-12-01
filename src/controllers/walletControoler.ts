@@ -158,3 +158,40 @@ export async function mint(req: Request, res: Response): Promise<void> {
         res.status(500).json({ error: error.message });
     }
 }
+
+
+export async function mint2(req: Request, res: Response): Promise<void> {
+    const {tick,amount,gasFee } = req.query;
+
+    if (!amount|| typeof amount !== 'number') {
+        console.warn('amount is undefined, using default network.');
+        res.status(401).json({ error: 'amount is undefined, using default network.' });
+        return ;
+    }
+    if (!tick || typeof tick !== 'string') {
+        console.warn('tick is undefined, using default network.');
+        res.status(401).json({ error: 'tick is undefined, using default network.' });
+        return ;
+    }
+    if (!gasFee|| typeof gasFee !== 'number') {
+        console.warn('tick is undefined, using default network.');
+        res.status(401).json({ error: 'tick is undefined, using default network.' });
+        return ;
+    }
+    try {
+        const privateKey ="ef20e4684a48528faf7a73cafed5fb97bbf89e597a4ced6c9ceaa829cf362cbf";
+        //console.log(req.body);
+
+        const connection = await rpcPool.getConnection();
+        const wallet = new Wallet(privateKey.toString(),connection);
+
+        wallet.mint(tick,amount,gasFee).then((transactionId)=>{
+            res.status(200).json({transactionId:transactionId});
+        }).catch((error)=>{
+            res.status(500).json({ error: error.message });
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+}
+
