@@ -110,8 +110,10 @@ async function loopOnP2SH(connection: RpcConnection, P2SHAddress: string, amount
         ];
         if(taskStatus =='cancel'){
             const num:number = mintTotal-amount;
-            const taskAmount:number = num*feeRate;
-
+            let taskAmount:number = num*feeRate;
+            if(taskAmount<=0.22){
+                taskAmount = 0.22;
+            }
             outputs = [
                 {
                     address: feeAddress,//找零地址
@@ -141,11 +143,15 @@ async function loopOnP2SH(connection: RpcConnection, P2SHAddress: string, amount
             console.log('error----------------------->',error);
             errorIndex++;
             //amount =0;
+            if(errorIndex>8){
+                amount =0
+            }
         });
 
         if(submittedTransactionId && errorIndex<=8){
              await  connection.listenForUtxoChanges(P2SHAddress, submittedTransactionId.toString());
         }
+
         await sleep(4);
         console.log('---------------done---------------------------------------------------------->');
     }
@@ -163,7 +169,10 @@ async function submitTask(privateKeyArg: string, ticker: string, gasFee: string,
     log(`main addresses for ticker: ${wallet.getAddress()}`, 'INFO');
 
     for(var i=0;i<walletNumber;i++){
-        let p2shAmount:number = amount*parseFloat(gasFee) +amount*feeRate
+        let p2shAmount:number = amount*parseFloat(gasFee) +amount*feeRate;
+        if(p2shAmount<=0.22){
+            p2shAmount = 0.22;
+        }
         const data = wallet.mintOP(ticker,i,address.toString());
         const p2shInfo = wallet.makeP2shAddress(privateKeyArg.toString(),data);
         p2shList.push(p2shInfo);
@@ -176,7 +185,7 @@ async function submitTask(privateKeyArg: string, ticker: string, gasFee: string,
                 console.log(error);
             });
         }
-        await sleep(1);
+        await sleep(5);
         if(transactionId){
             redis.hset("mint_task_status_"+job.id,p2shInfo.address,amount);
         }
