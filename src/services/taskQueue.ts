@@ -79,11 +79,13 @@ function sleep(seconds:number) {
 
 async function updateProgress(job:Job,address,amount){
     await redis.hset("mint_task_status_"+job.id,address,amount);
-    //const list = await redis.hgetall("mint_task_status_"+job.id);
+    const list = await redis.hgetall("mint_task_status_"+job.id)
+    const total = Object.values(list).reduce((sum, value) => sum + parseInt(value, 10), 0);
+    job.data.current = job.data.total-total;
+    await job.update(job.data);
     if(amount == 0){
         await job.progress(100);
     }
-    //console.log(list);
 }
 // //找零归集
 // // P2SH 地址循环上链操作
@@ -253,12 +255,18 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
             await connection.listenForUtxoChanges(address, transactionId.toString()!).catch((error) => {
                 console.log('---------->main \n',error);
             });
+            job.data.status = "send";
+            await job.update(job.data);
         }
+
     }
 
     const tasks = p2shList.map(async (item:ItemType) => {
         // P2SH 地址循环上链操作
+
         await RPC.subscribeUtxosChanged([item.address.toString()]);
+        job.data.status = "minting";
+        await job.update(job.data);
         await loopOnP2SHV2(RPC,connection, item.address, amount, gasFee.toString(), privateKey, item.script,job,address);
         await RPC.unsubscribeUtxosChanged([item.address.toString()]);
     });
@@ -308,6 +316,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             amount--;
             errorIndex =0;
             updateProgress(job,P2SHAddress,amount);
+
             return submittedTransactionId.transactionId;
         }).catch((error) => {
             console.log('error----------------------->',error);
@@ -333,8 +342,17 @@ async function getTaskStatus(taskId: string|number) {
         return undefined;
     }
     const {status} = job.data;
-    //console.log(status);
     return status;
+}
+
+async function getTaskMintStatus(taskId: string|number) {
+    const job = await taskQueue.getJob(taskId);
+    if(!job){
+        return undefined;
+    }
+    const {status} = job.data;
+    const list = await redis.hgetall("mint_task_status_"+job.id);
+    return {list:list,status:status,taskInfo:job.data};
 }
 
 // 取消任务
@@ -351,10 +369,8 @@ async function cancelTask(taskId: string) {
 
 // 任务处理器
 taskQueue.process(50,async (job) => {
-
+    console.log("taskQueue processing \n");
     const { privateKey, ticker, gasFee, amount,walletNumber,network} = job.data;
-    await redis.hset("task_status",job.id,job.data);
-
     try {
         log(`Starting task with data: ${JSON.stringify(job.data)}`, 'INFO');
         const taskResult = await submitTaskV2(privateKey, ticker, gasFee, amount,walletNumber,network,job);
@@ -367,4 +383,13 @@ taskQueue.process(50,async (job) => {
     }
 });
 
-export { taskQueue, submitTaskV2, getTaskStatus, cancelTask };
+taskQueue.on('ready', async () => {
+    const failedJobs = await taskQueue.getFailed();
+    console.log(`taskQueue ready, failed jobs: ${failedJobs.length}`);
+    for (const job of failedJobs) {
+        await job.retry();
+        console.log(`Retrying job: ${job.id}`);
+    }
+});
+
+export { taskQueue, submitTaskV2, getTaskMintStatus, cancelTask };

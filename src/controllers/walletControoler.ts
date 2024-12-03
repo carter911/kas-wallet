@@ -104,12 +104,7 @@ export async function send(req: Request, res: Response): Promise<void> {
 
 
 export async function transfer(req: Request, res: Response): Promise<void> {
-    const {network,rpcUrl,privateKey, address,tick,amount,gasFee } = req.body;
-    console.log(rpcUrl)
-    if (!network) {
-        console.warn('Network is undefined, using default network.');
-        res.status(401).json({ error: 'Network is undefined, using default network.' });
-    }
+    const {privateKey, address,ticker,amount,gasFee } = req.body;
     if (!privateKey) {
         console.warn('privateKey is undefined, using default network.');
         res.status(401).json({ error: 'privateKey is undefined, using default network.' });
@@ -122,9 +117,9 @@ export async function transfer(req: Request, res: Response): Promise<void> {
         console.warn('amount is undefined, using default network.');
         res.status(401).json({ error: 'amount is undefined, using default network.' });
     }
-    if (!tick) {
-        console.warn('tick is undefined, using default network.');
-        res.status(401).json({ error: 'tick is undefined, using default network.' });
+    if (!ticker) {
+        console.warn('ticker is undefined, using default network.');
+        res.status(401).json({ error: 'ticker is undefined, using default network.' });
     }
     try {
         const connection = await rpcPool.getConnection();
@@ -136,7 +131,7 @@ export async function transfer(req: Request, res: Response): Promise<void> {
                 throw new Error("Insufficient balance");
             }
         });
-        const transactionId = await wallet.transfer(tick.toString(),address.toString(),sendAmount,gasFee);
+        const transactionId = await wallet.transfer(ticker.toString(),address.toString(),sendAmount,gasFee);
         res.status(200).json({transactionId:transactionId});
     } catch (error: any) {
         res.status(503).json({ error: error.message });

@@ -1,6 +1,6 @@
 // src/controllers/taskController.ts
 import { Request, Response } from 'express';
-import { taskQueue, getTaskStatus, cancelTask } from '../services/taskQueue';
+import { taskQueue, getTaskMintStatus, cancelTask } from '../services/taskQueue';
 import Wallet from "../services/Wallet";
 import rpcPool from "../app";
 
@@ -57,8 +57,8 @@ export async function getStatus(req: Request, res: Response): Promise<void> {
     }
 
     try {
-        const status = await getTaskStatus(taskId);
-        res.status(200).json({ taskId, status });
+        const data = await getTaskMintStatus(taskId);
+        res.status(200).json(data);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
