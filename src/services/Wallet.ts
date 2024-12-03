@@ -73,7 +73,7 @@ class Wallet {
         const address = this.getAddress();
         const balance = await RPC.getBalanceByAddress({ address });
         console.log(balance,address)
-        return sompiToKaspaString(balance.balance);
+        return sompiToKaspaString(balance.balance).toString();
     }
 
     // Send KAS
@@ -88,6 +88,34 @@ class Wallet {
         const { transactions: transactions } = await createTransactions({
             entries: UTXO.entries,
             outputs: [output],
+            changeAddress: address.toString(),
+            priorityFee: kaspaToSompi(gasFee.toString())!,
+            networkId: this.network
+        });
+
+        let hash: any;
+        for (const transaction of transactions) {
+            transaction.sign([this.privateKeyObj], false);
+            hash = await transaction.submit(RPC);
+            console.log(hash);
+        }
+        return hash;
+    }
+
+    async sendV2(toAddressList:any, gasFee: number=0.00002) {
+        const RPC = await this.RpcConnection.getRpcClient();
+        const address = this.getAddress();
+        const UTXO = await RPC.getUtxosByAddresses({ addresses: [address.toString()] });
+        let outputs: IPaymentOutput[] = [];
+        toAddressList.forEach((toAddress:any)=>{
+            outputs.push({
+                address: toAddress.address.toString(),
+                amount: kaspaToSompi(toAddress.amount.toString())!
+            })
+        })
+        const { transactions: transactions } = await createTransactions({
+            entries: UTXO.entries,
+            outputs: outputs,
             changeAddress: address.toString(),
             priorityFee: kaspaToSompi(gasFee.toString())!,
             networkId: this.network

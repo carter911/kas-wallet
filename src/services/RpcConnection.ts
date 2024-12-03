@@ -72,17 +72,9 @@ class RpcConnection {
     }
 
     // 监听 UTXO 变化，并且提供更强的超时控制
-    public async listenForUtxoChanges(address: string, submittedTransactionId: string, timeout: number = 300000) {
+    public async listenForUtxoChanges(address: string, submittedTransactionId: string) {
         let eventReceived = false;
-        return new Promise<string>((resolve, reject) => {
-            // 使用一个合理的超时来结束监听
-            const revealTimeout = setTimeout(() => {
-                if (!eventReceived) {
-                    log('Transaction did not mature within the specified timeout.', 'ERROR');
-                    reject(new Error('Transaction timeout'));
-                }
-            }, timeout);
-
+        return new Promise<string>((resolve) => {
             // 监听 UTXO 变化
             this.rpcClient.addEventListener('utxos-changed', async (event: any) => {
                 //log(`UTXO changes detected for address: ${address}`, 'INFO');
@@ -91,17 +83,16 @@ class RpcConnection {
                 const removedEntry = event.data.removed.find((entry: any) => entry.address.payload === addressPayload);
 
                 if (addedEntry && addedEntry.outpoint.transactionId === submittedTransactionId) {
-                    log(`Matched submitted transaction ID: ${addedEntry.outpoint.transactionId}`, 'INFO');
+                    //log(`Matched submitted transaction ID: ${addedEntry.outpoint.transactionId}`, 'INFO');
                     eventReceived = true;
                 }
 
                 if (removedEntry && removedEntry.outpoint.transactionId === submittedTransactionId) {
-                    log(`Matched submitted transaction ID: ${removedEntry.outpoint.transactionId}`, 'INFO');
+                    //log(`Matched submitted transaction ID: ${removedEntry.outpoint.transactionId}`, 'INFO');
                     eventReceived = true;
                 }
 
                 if (eventReceived) {
-                    clearTimeout(revealTimeout);
                     resolve(submittedTransactionId);
                 }
             });

@@ -17,8 +17,10 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
         const wallet = new Wallet(privateKey.toString(),connection);
         const address = wallet.getAddress();
         const balance = await wallet.getBalance();
-        console.log(balance);
-        if(parseFloat(balance)<(amount+gasFee)*walletNumber){
+
+        const balance2 = parseFloat(balance.replace(/,/g, ''));
+        console.log(balance,balance2);
+        if(balance2<(amount+gasFee)*walletNumber){
             res.status(400).json({ error: address+' :Insufficient balance' });
             return;
         }

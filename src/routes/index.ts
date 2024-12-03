@@ -1,6 +1,6 @@
 import express from 'express';
 import { submitForm, getStatus, cancel } from '../controllers/taskControoler';
-import { balance, generateAddress, importAddress, send, transfer, mint } from '../controllers/walletControoler';
+import { balance, generateAddress, importAddress, send, transfer } from '../controllers/walletControoler';
 
 const router = express.Router();
 
@@ -13,6 +13,5 @@ router.post('/wallet/import', importAddress);
 router.post('/wallet/balance', balance);
 router.post('/wallet/send', send);
 router.post('/wallet/transfer', transfer);
-router.post('/wallet/mint', mint);
 
 export default router;
