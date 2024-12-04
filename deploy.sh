@@ -58,9 +58,15 @@ if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
     # 检查端口占用
     check_port
 
-    # 重启 PM2 应用
-    echo "重启 PM2 应用..."
-    pm2 restart "$APP_NAME" || { echo "PM2 重启失败"; exit 1; }
+    # 检查 PM2 应用是否已存在
+    echo "检查 PM2 应用状态..."
+    if ! pm2 list | grep -q "$APP_NAME"; then
+        echo "应用未运行，尝试启动应用..."
+        pm2 start ecosystem.config.js --env development || { echo "PM2 启动失败"; exit 1; }
+    else
+        echo "应用已存在，重启应用..."
+        pm2 restart "$APP_NAME" || { echo "PM2 重启失败"; exit 1; }
+    fi
 
     echo "部署完成！"
 else
