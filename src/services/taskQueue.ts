@@ -435,13 +435,5 @@ taskQueue.process(50,async (job) => {
     }
 });
 
-// taskQueue.on('ready', async () => {
-//     const failedJobs = await taskQueue.getFailed();
-//     console.log(`taskQueue ready, failed jobs: ${failedJobs.length}`);
-//     for (const job of failedJobs) {
-//         await job.retry();
-//         console.log(`Retrying job: ${job.id}`);
-//     }
-// });
 
 export { taskQueue, submitTaskV2, getTaskMintStatus, cancelTask };
