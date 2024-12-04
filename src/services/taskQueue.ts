@@ -77,15 +77,19 @@ function sleep(seconds:number) {
 //     return submittedTransactionId;
 // }
 
-async function updateProgress(job:Job,address,amount){
+async function updateProgress(job:Job,address,amount,status?:string){
     await redis.hset("mint_task_status_"+job.id,address,amount);
     const list = await redis.hgetall("mint_task_status_"+job.id)
     const total = Object.values(list).reduce((sum, value) => sum + parseInt(value, 10), 0);
     job.data.current = job.data.total-total;
-    await job.update(job.data);
-    if(amount == 0){
+    if(status){
+        job.data.status = status;
+    }
+    if(job.data ==total){
+        job.data.status = 'completed';
         await job.progress(100);
     }
+    await job.update(job.data);
 }
 // //找零归集
 // // P2SH 地址循环上链操作
@@ -247,6 +251,9 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     });
     await RPC.subscribeUtxosChanged([address.toString()]);
     let realGasFee:number = (AddressList.length+1);
+    if(walletNumber==1){
+        realGasFee = 0.0004;
+    }
 
     //避免进程启动过程中，重复提交任务
     if(!await redis.get("mint_task_send_"+job.id)){
@@ -297,6 +304,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
         }, 0n);
         let toAddress = P2SHAddress;
         if(taskStatus =='cancel' ||amount ==2){
+            updateProgress(job,P2SHAddress,amount,'cancel');
             toAddress = address;
             amount=1;
         }
