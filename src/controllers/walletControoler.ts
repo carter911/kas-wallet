@@ -37,6 +37,24 @@ export async function importAddress(req: Request, res: Response): Promise<void> 
     }
 }
 
+export async function importByPrivateKey(req: Request, res: Response): Promise<void> {
+    const { privateKey } = req.body;
+    if (!privateKey || typeof privateKey !== 'string') {
+        console.warn('privateKey is undefined');
+        res.status(401).json({ error: 'privateKey is undefined' });
+        return;
+    }
+    try {
+        const connection = await rpcPool.getConnection();
+        const wallet = new Wallet(privateKey,connection);
+        const address = wallet.getAddress();
+        //const address = await key.generateAddressFromXPrv(xprv.toString());
+        res.status(200).json({address:address});
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+}
+
 export async function balance(req: Request, res: Response): Promise<void> {
     const { privateKey } = req.body;
     if (!privateKey) {

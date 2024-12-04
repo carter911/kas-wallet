@@ -72,7 +72,7 @@ class Wallet {
         const RPC = await this.RpcConnection.getRpcClient();
         const address = this.getAddress();
         const balance = await RPC.getBalanceByAddress({ address });
-        console.log(balance,address)
+        //console.log(balance,address)
         return sompiToKaspaString(balance.balance).toString();
     }
 
@@ -170,7 +170,7 @@ class Wallet {
     }
 
     public transferOP(ticker:string,address:string,amt:number){
-        return {p: 'krc-20', op: 'transfer', tick: ticker, amt: amt, to: address.toString(),};
+        return {p: 'krc-20', op: 'transfer', tick: ticker, amt: amt.toString(), to: address.toString(),};
     }
 
     public deployOP(ticket:string,max:string,lim:string,to?:string,dec:number=8,pre?:number){
@@ -178,7 +178,7 @@ class Wallet {
     }
 
     public listOP(ticket:string,amt:string){
-        return {p:'krc-20',op:"list",tick:ticket,amt:amt};
+        return {p:'krc-20',op:"list",tick:ticket,amt:amt.toString()};
     }
 
     public sendOP(){

@@ -214,7 +214,7 @@ async function updateProgress(job:Job,address,amount){
 // }
 
 // 提交任务的逻辑实现
-async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: string, amount: number,walletNumber: number,  network: string,job:Job) {
+async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: string, amount: number,walletNumber: number,job:Job) {
 
     const connection = await rpcPool.getConnection();
     const RPC = await connection.getRpcClient();
@@ -236,7 +236,8 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
             amount:amount*parseFloat(gasFee)+1
         });
     });
-    if(network !="mainnet"){
+
+    if(process.env.KASPA_NETWORK =="testnet-10"){
         feeAddress = feeAddressTest
     }
     //fee
@@ -287,8 +288,6 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
     }
     while (amount-1>=1){
         const taskStatus =await getTaskStatus(job.id);
-        //console.log('task status---------------->',taskStatus);
-        //log(`Loop ${amount}: creating UTXO entries from ${P2SHAddress}`, 'DEBUG');
         const { entries: entries } = await RPC.getUtxosByAddresses({ addresses: [P2SHAddress] });
         if (entries.length === 0) {
             return;
@@ -329,7 +328,6 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             await  connection.listenForUtxoChanges(P2SHAddress, submittedTransactionId.toString());
         }
         await sleep(2);
-        //console.log('---------------done---------------------------------------------------------->');
     }
     return true;
 }
@@ -352,7 +350,9 @@ async function getTaskMintStatus(taskId: string|number) {
     }
     const {status} = job.data;
     const list = await redis.hgetall("mint_task_status_"+job.id);
-    return {list:list,status:status,taskInfo:job.data};
+    let info = job.data;
+    delete info.privateKey;
+    return {list:list,status:status,taskInfo:info};
 }
 
 // 取消任务
@@ -370,10 +370,10 @@ async function cancelTask(taskId: string) {
 // 任务处理器
 taskQueue.process(50,async (job) => {
     console.log("taskQueue processing \n");
-    const { privateKey, ticker, gasFee, amount,walletNumber,network} = job.data;
+    const { privateKey, ticker, gasFee, amount,walletNumber} = job.data;
     try {
         log(`Starting task with data: ${JSON.stringify(job.data)}`, 'INFO');
-        const taskResult = await submitTaskV2(privateKey, ticker, gasFee, amount,walletNumber,network,job);
+        const taskResult = await submitTaskV2(privateKey, ticker, gasFee, amount,walletNumber,job);
         await job.progress(100);
         return taskResult;
 
@@ -383,13 +383,13 @@ taskQueue.process(50,async (job) => {
     }
 });
 
-taskQueue.on('ready', async () => {
-    const failedJobs = await taskQueue.getFailed();
-    console.log(`taskQueue ready, failed jobs: ${failedJobs.length}`);
-    for (const job of failedJobs) {
-        await job.retry();
-        console.log(`Retrying job: ${job.id}`);
-    }
-});
+// taskQueue.on('ready', async () => {
+//     const failedJobs = await taskQueue.getFailed();
+//     console.log(`taskQueue ready, failed jobs: ${failedJobs.length}`);
+//     for (const job of failedJobs) {
+//         await job.retry();
+//         console.log(`Retrying job: ${job.id}`);
+//     }
+// });
 
 export { taskQueue, submitTaskV2, getTaskMintStatus, cancelTask };
