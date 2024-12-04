@@ -7,10 +7,7 @@ const crypto = require('crypto');
 export async function submitForm(req: Request, res: Response): Promise<void> {
     const { privateKey, ticker, gasFee, amount,walletNumber, network,notifyUrl } = req.body;
 
-    //amount mint张数
-    //gasFee mint手续费
-    //最后分佣 每个钱包的金额为 amount*gasFee +amount*feeAmount+gasFee
-    console.log('--------------------->',req.body);
+
     try {
         if(req.pool==undefined){
             console.log(11);
