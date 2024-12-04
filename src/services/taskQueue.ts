@@ -77,8 +77,11 @@ function sleep(seconds:number) {
 //     return submittedTransactionId;
 // }
 
+
+
 async function updateProgress(job:Job,address,amount,status?:string){
     await redis.hset("mint_task_status_"+job.id,address,amount);
+    await redis.expire("mint_task_status_"+job.id, 3600*24*7);
     const list = await redis.hgetall("mint_task_status_"+job.id)
     const total = Object.values(list).reduce((sum, value) => sum + parseInt(value, 10), 0);
     job.data.current = job.data.total-total;
@@ -99,11 +102,12 @@ async function updateProgress(job:Job,address,amount,status?:string){
         await job.update(job.data);
         await job.progress(100);
     }
-
-    if(job.data.notifyUrl){
+    let state = await redis.get("mint_task_notify_"+job.id)
+    if(job.data.notifyUrl && !state){
         delete job.data.privateKey;
         let notify = new Notify();
         await notify.sendMessage(job.data.notifyUrl,job.data);
+        await redis.setex("mint_task_notify_"+job.id, 10,1);
     }
 }
 // //找零归集
@@ -271,14 +275,16 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     }
     //取消任务
     if(job.data.status =='cancel'){
-        await job.progress(100)
+        job.data.status = 'canceled';
+        await job.update(job.data);
+        await job.progress(100);
         return;
     }
     //避免进程启动过程中，重复提交任务
     if(!await redis.get("mint_task_send_"+job.id) ){
         const transactionId = await wallet.sendV2(AddressList,realGasFee);
         if (transactionId) {
-            await redis.set("mint_task_send_"+job.id,transactionId);
+            await redis.setex("mint_task_send_"+job.id,7*24*60*60,transactionId);
             await connection.listenForUtxoChanges(address, transactionId.toString()!).catch((error) => {
                 console.log('---------->main \n',error);
             });
@@ -356,7 +362,6 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             amount--;
             errorIndex =0;
             updateProgress(job,P2SHAddress,amount);
-
             return submittedTransactionId.transactionId;
         }).catch((error) => {
             console.log('error----------------------->',error);
