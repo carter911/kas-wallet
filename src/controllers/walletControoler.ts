@@ -68,7 +68,6 @@ export async function balance(req: Request, res: Response): Promise<void> {
         const connection = await rpcPool.getConnection();
         const RPC = await connection.getRpcClient();
         const request = {
-            //txSize: 300,      // 交易大小，单位字节
             numInputs: 1,     // 输入数量
             numOutputs: 1     // 输出数量
         };

@@ -339,6 +339,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
     return true;
 }
 
+
 // 获取任务状态
 async function getTaskStatus(taskId: string|number) {
     const job = await taskQueue.getJob(taskId);
