@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # 定义变量
-REPO_DIR="/www/wwwroot/kas-mint"
-WWW_DIR="/www/wwwroot/kas-mint"
+REPO_DIR="./"
+WWW_DIR="./"
 APP_NAME="kas-mint"
 TS_CONFIG="tsconfig.json"
 
@@ -38,10 +38,6 @@ if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
     # 编译 TypeScript 项目
     echo "编译 TypeScript..."
     npx tsc -p "$TS_CONFIG" || { echo "TypeScript 编译失败"; exit 1; }
-
-    # 同步到生产目录
-    echo "同步代码到生产目录..."
-    rsync -a --delete "$REPO_DIR/" "$WWW_DIR/" || { echo "代码同步失败"; exit 1; }
 
     # 重启 PM2 应用
     echo "重启 PM2 应用..."
