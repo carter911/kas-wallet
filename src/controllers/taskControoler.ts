@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { taskQueue, getTaskMintStatus, cancelTask } from '../services/taskQueue';
 import Wallet from "../services/Wallet";
+const crypto = require('crypto');
 
 // 提交任务的控制器
 export async function submitForm(req: Request, res: Response): Promise<void> {
@@ -28,7 +29,7 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
         }
         console.log('--------------------->',balance);
         // 将任务数据添加到 Bull 队列
-        const job = await taskQueue.add({
+        let data = {
             privateKey,
             ticker,
             gasFee,
@@ -39,7 +40,9 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
             current:0,
             status: 'pending',
             notifyUrl,
-        });
+        };
+        const hash = crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex');
+        const job = await taskQueue.add(data, { jobId: hash });
         await job.progress(0);
         // 返回任务ID以及提交确认
         res.status(202).json({
