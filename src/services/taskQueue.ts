@@ -1,4 +1,3 @@
-import Bull, {Job} from 'bull';
 import {
     ScriptBuilder,
     PrivateKey,
@@ -11,16 +10,16 @@ import {
 import Wallet from "./Wallet";
 import RpcConnection from "./RpcConnection";
 import Redis from "ioredis";
-import RpcConnectionPool from "./RpcConnectionPool";
 type ItemType = {
     address: string;
     script: ScriptBuilder;
     publicKey: string;
 };
+import {Job} from "bull";
 // 初始化 Redis 连接
+import {taskQueue,rpcPool} from "../middleware";
+import Notify from "./Notify";
 const redisOptions:any = { host: '127.0.0.1', port: 6379 ,password:''};
-const taskQueue = new Bull('mint-queue', redisOptions);
-const rpcPool = new RpcConnectionPool(10, 100);
 const redis = new Redis(redisOptions);
 // const u64MaxValue = 18446744073709551615;
 const feeRate:number = 0.02;
@@ -83,18 +82,28 @@ async function updateProgress(job:Job,address,amount,status?:string){
     const list = await redis.hgetall("mint_task_status_"+job.id)
     const total = Object.values(list).reduce((sum, value) => sum + parseInt(value, 10), 0);
     job.data.current = job.data.total-total;
+    await job.update(job.data);
     if(status){
         job.data.status = status;
         job.data.cancelnum = +1;
+
         if(job.data.cancelnum == job.data.walletNumber){
             job.data.status = 'canceled';
+            await job.update(job.data);
+            await job.progress(100);
         }
         await job.update(job.data);
     }
-    if(job.data ==total){
+    if(job.data.current == total && job.data.status != 'canceled'&& job.data.status != 'cancel'){
         job.data.status = 'completed';
         await job.update(job.data);
         await job.progress(100);
+    }
+
+    if(job.data.notifyUrl){
+        delete job.data.privateKey;
+        let notify = new Notify();
+        await notify.sendMessage(job.data.notifyUrl,job.data);
     }
 }
 // //找零归集
@@ -239,28 +248,34 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
         p2shList.push(p2shInfo);
     }
     let AddressList:any = [];
-    p2shList.forEach((item:ItemType) => {
-        AddressList.push({
-            address:item.address.toString(),
-            amount:amount*parseFloat(gasFee)+1
-        });
+    p2shList.forEach((item:ItemType,index) => {
+        if(index ==0){
+            AddressList.push({
+                address:item.address.toString(),
+                amount:amount*parseFloat(gasFee)+1+amount*feeRate*walletNumber
+            });
+        }else{
+            AddressList.push({
+                address:item.address.toString(),
+                amount:amount*parseFloat(gasFee)+1
+            });
+        }
     });
-
     if(process.env.KASPA_NETWORK =="testnet-10"){
         feeAddress = feeAddressTest
     }
-    //fee
-    AddressList.push({
-        address:feeAddress.toString(),
-        amount:amount*feeRate*walletNumber
-    });
     await RPC.subscribeUtxosChanged([address.toString()]);
-    let realGasFee:number = (AddressList.length+1);
+    let realGasFee:number = (AddressList.length);
     if(walletNumber==1){
         realGasFee = 0.0004;
     }
+    //取消任务
+    if(job.data.status =='cancel'){
+        await job.progress(100)
+        return;
+    }
     //避免进程启动过程中，重复提交任务
-    if(!await redis.get("mint_task_send_"+job.id)){
+    if(!await redis.get("mint_task_send_"+job.id) ){
         const transactionId = await wallet.sendV2(AddressList,realGasFee);
         if (transactionId) {
             await redis.set("mint_task_send_"+job.id,transactionId);
@@ -272,14 +287,18 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
         }
 
     }
-
-    const tasks = p2shList.map(async (item:ItemType) => {
+    let feeAmount = amount*feeRate*walletNumber;
+    if(feeAmount<=0.22){
+        feeAmount = 0.22;
+    }
+    const tasks = p2shList.map(async (item:ItemType,index) => {
         // P2SH 地址循环上链操作
-
+        let feeInfo :any = {
+            address:feeAddress,
+            amount:kaspaToSompi(feeAmount.toString())!
+        }
         await RPC.subscribeUtxosChanged([item.address.toString()]);
-        job.data.status = "minting";
-        await job.update(job.data);
-        await loopOnP2SHV2(RPC,connection, item.address, amount, gasFee.toString(), privateKey, item.script,job,address);
+        await loopOnP2SHV2(RPC,connection, item.address, amount, gasFee.toString(), privateKey, item.script,job,address,index,feeInfo);
         await RPC.unsubscribeUtxosChanged([item.address.toString()]);
     });
 
@@ -290,14 +309,15 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     return { status: 'success' };
 }
 
-async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, amountNum: number, gasFee: string, privateKey: PrivateKey,script:ScriptBuilder,job:Job,address) {
+async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, amountNum: number, gasFee: string, privateKey: PrivateKey,script:ScriptBuilder,job:Job,address,index:number,feeInfo:any) {
     let errorIndex=0;
     let cacheNum:string|null = await redis.hget("mint_task_status_"+job.id,P2SHAddress);
     let amount:number = amountNum;
     if(cacheNum !== null){
         amount = parseInt(cacheNum);
     }
-    console.log(amount);
+    let mintTotal = amount;
+    console.log('------------------>',index,amount);
     while (amount>0){
         const taskStatus =await getTaskStatus(job.id);
         const { entries: entries } = await RPC.getUtxosByAddresses({ addresses: [P2SHAddress] });
@@ -309,7 +329,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
         }, 0n);
         let toAddress = P2SHAddress;
         if(taskStatus =='cancel'){
-            await updateProgress(job,P2SHAddress,amount,'cancel');
+            await updateProgress(job,P2SHAddress,amount,'canceled');
             toAddress = address;
             amount=1;
         }
@@ -322,6 +342,11 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
                 amount: total - kaspaToSompi(gasFee)!
             }
         ];
+        //fee
+        if(index == 0 && amount == mintTotal){
+            outputs[0].amount = total - kaspaToSompi(gasFee)!-feeInfo.amount;
+            outputs.push(feeInfo);
+        }
         const transaction = createTransaction(entries, outputs,kaspaToSompi(gasFee)!, "", 1);
         transaction.inputs.forEach((_,index) => {
             let signature = createInputSignature(transaction, index, privateKey, SighashType.All);

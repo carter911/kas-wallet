@@ -4,7 +4,7 @@ import Wallet from "../services/Wallet";
 
 // 提交任务的控制器
 export async function submitForm(req: Request, res: Response): Promise<void> {
-    const { privateKey, ticker, gasFee, amount,walletNumber, network } = req.body;
+    const { privateKey, ticker, gasFee, amount,walletNumber, network,notifyUrl } = req.body;
 
     //amount mint张数
     //gasFee mint手续费
@@ -38,6 +38,7 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
             total:amount*walletNumber,
             current:0,
             status: 'pending',
+            notifyUrl,
         });
         await job.progress(0);
         // 返回任务ID以及提交确认
