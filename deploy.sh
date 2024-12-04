@@ -1,12 +1,28 @@
 #!/bin/bash
 export HOME=/root
+
 # 定义变量
 REPO_DIR="./"
-WWW_DIR="./"
 APP_NAME="kas-mint"
 TS_CONFIG="tsconfig.json"
+PORT=3000 # 应用监听的端口
 
 echo "开始检查代码更新..."
+
+# 检查端口是否被占用的函数
+check_port() {
+    echo "检查端口 $PORT 是否被占用..."
+    if lsof -i:$PORT > /dev/null 2>&1; then
+        echo "端口 $PORT 被占用，尝试释放..."
+        PID=$(lsof -t -i:$PORT)
+        if [ -n "$PID" ]; then
+            echo "杀死占用端口的进程 PID: $PID"
+            kill -9 "$PID" || { echo "无法终止进程 $PID"; exit 1; }
+        fi
+    else
+        echo "端口 $PORT 未被占用。"
+    fi
+}
 
 # 进入项目目录
 cd "$REPO_DIR" || { echo "目录 $REPO_DIR 不存在"; exit 1; }
@@ -38,6 +54,9 @@ if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
     # 编译 TypeScript 项目
     echo "编译 TypeScript..."
     npx tsc -p "$TS_CONFIG" || { echo "TypeScript 编译失败"; exit 1; }
+
+    # 检查端口占用
+    check_port
 
     # 重启 PM2 应用
     echo "重启 PM2 应用..."
