@@ -63,7 +63,6 @@ export async function balance(req: Request, res: Response): Promise<void> {
         return ;
     }
 
-    console.log(privateKey);
     try {
         const connection = await rpcPool.getConnection();
         const RPC = await connection.getRpcClient();
@@ -72,7 +71,7 @@ export async function balance(req: Request, res: Response): Promise<void> {
             numOutputs: 1     // 输出数量
         };
         const fee = await RPC.getFeeEstimate(request);
-        console.log(fee?.estimate);
+        //console.log(fee?.estimate);
         const wallet = new Wallet(privateKey.toString(),connection);
         const address = wallet.getAddress();
         const balance = await wallet.getBalance();
