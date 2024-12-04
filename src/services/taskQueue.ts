@@ -254,7 +254,6 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     if(walletNumber==1){
         realGasFee = 0.0004;
     }
-
     //避免进程启动过程中，重复提交任务
     if(!await redis.get("mint_task_send_"+job.id)){
         const transactionId = await wallet.sendV2(AddressList,realGasFee);

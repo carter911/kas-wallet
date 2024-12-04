@@ -141,7 +141,6 @@ class Wallet {
         }, 0n);
 
         const changeAddress = change || address;
-
         console.log(amount);
         const safeGasFee = gasFee ?? "0"; // Use "0" or another appropriate fallback value
         const safeTotal = total ?? 0; // Default to 0 if `total` is `undefined`
