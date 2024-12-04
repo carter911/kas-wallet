@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import Wallet from '../services/Wallet';
 import Keys from '../services/Keys';
 import Krc from '../services/Krc';
-import rpcPool from "../app";
 //  获取钱包地址
 export async function generateAddress(req: Request, res: Response): Promise<void> {
     const {password } = req.body;
@@ -30,7 +29,7 @@ export async function importAddress(req: Request, res: Response): Promise<void> 
     }
     try {
         const key = new Keys();
-        const address = await key.generateAddressFromXPrv(xprv.toString());
+        const address = await key.generateAddressFromXPrv(xprv);
         res.status(200).json(address);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -45,10 +44,9 @@ export async function importByPrivateKey(req: Request, res: Response): Promise<v
         return;
     }
     try {
-        const connection = await rpcPool.getConnection();
+        const connection = await req.pool.getConnection();
         const wallet = new Wallet(privateKey,connection);
         const address = wallet.getAddress();
-        //const address = await key.generateAddressFromXPrv(xprv.toString());
         res.status(200).json({address:address});
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -64,7 +62,7 @@ export async function balance(req: Request, res: Response): Promise<void> {
     }
 
     try {
-        const connection = await rpcPool.getConnection();
+        const connection = await req.pool.getConnection();
         // const RPC = await connection.getRpcClient();
         // const request = {
         //     numInputs: 1,     // 输入数量
@@ -102,7 +100,7 @@ export async function send(req: Request, res: Response): Promise<void> {
     }
 
     try {
-        const connection = await rpcPool.getConnection();
+        const connection = await req.pool.getConnection();
         const wallet = new Wallet(privateKey.toString(),connection);
         console.log(wallet.getAddress())
         wallet.getBalance().then((balance)=>{
@@ -138,7 +136,7 @@ export async function transfer(req: Request, res: Response): Promise<void> {
         res.status(401).json({ error: 'ticker is undefined, using default network.' });
     }
     try {
-        const connection = await rpcPool.getConnection();
+        const connection = await req.pool.getConnection();
         const wallet = new Wallet(privateKey.toString(),connection);
         const sendAmount = amount*100000000;
         const sendAddress = wallet.getAddress();

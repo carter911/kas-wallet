@@ -1,8 +1,6 @@
-// src/controllers/taskController.ts
 import { Request, Response } from 'express';
 import { taskQueue, getTaskMintStatus, cancelTask } from '../services/taskQueue';
 import Wallet from "../services/Wallet";
-import rpcPool from "../app";
 
 // 提交任务的控制器
 export async function submitForm(req: Request, res: Response): Promise<void> {
@@ -13,7 +11,11 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
     //最后分佣 每个钱包的金额为 amount*gasFee +amount*feeAmount+gasFee
     console.log('--------------------->',req.body);
     try {
-        const connection = await rpcPool.getConnection();
+        if(req.pool==undefined){
+            console.log(11);
+            return ;
+        }
+        const connection = await req.pool.getConnection();
         const wallet = new Wallet(privateKey.toString(),connection);
         const address = wallet.getAddress();
         const balance = await wallet.getBalance();

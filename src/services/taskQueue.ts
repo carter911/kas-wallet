@@ -10,8 +10,8 @@ import {
 } from '../Library/wasm/kaspa';
 import Wallet from "./Wallet";
 import RpcConnection from "./RpcConnection";
-import rpcPool from "../app";
 import Redis from "ioredis";
+import RpcConnectionPool from "./RpcConnectionPool";
 type ItemType = {
     address: string;
     script: ScriptBuilder;
@@ -19,7 +19,8 @@ type ItemType = {
 };
 // 初始化 Redis 连接
 const redisOptions:any = { host: '127.0.0.1', port: 6379 ,password:''};
-const taskQueue = new Bull('taskQueue', redisOptions);
+const taskQueue = new Bull('mint-queue', redisOptions);
+const rpcPool = new RpcConnectionPool(10, 100);
 const redis = new Redis(redisOptions);
 // const u64MaxValue = 18446744073709551615;
 const feeRate:number = 0.02;
@@ -84,12 +85,17 @@ async function updateProgress(job:Job,address,amount,status?:string){
     job.data.current = job.data.total-total;
     if(status){
         job.data.status = status;
+        job.data.cancelnum = +1;
+        if(job.data.cancelnum == job.data.walletNumber){
+            job.data.status = 'canceled';
+        }
+        await job.update(job.data);
     }
     if(job.data ==total){
         job.data.status = 'completed';
+        await job.update(job.data);
         await job.progress(100);
     }
-    await job.update(job.data);
 }
 // //找零归集
 // // P2SH 地址循环上链操作
@@ -219,7 +225,6 @@ async function updateProgress(job:Job,address,amount,status?:string){
 
 // 提交任务的逻辑实现
 async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: string, amount: number,walletNumber: number,job:Job) {
-
     const connection = await rpcPool.getConnection();
     const RPC = await connection.getRpcClient();
     const privateKey = new PrivateKey(privateKeyArg.toString());
@@ -292,7 +297,8 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
     if(cacheNum !== null){
         amount = parseInt(cacheNum);
     }
-    while (amount-1>=1){
+    console.log(amount);
+    while (amount>0){
         const taskStatus =await getTaskStatus(job.id);
         const { entries: entries } = await RPC.getUtxosByAddresses({ addresses: [P2SHAddress] });
         if (entries.length === 0) {
@@ -302,10 +308,13 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             return curr.amount + agg;
         }, 0n);
         let toAddress = P2SHAddress;
-        if(taskStatus =='cancel' ||amount ==2){
-            updateProgress(job,P2SHAddress,amount,'cancel');
+        if(taskStatus =='cancel'){
+            await updateProgress(job,P2SHAddress,amount,'cancel');
             toAddress = address;
             amount=1;
+        }
+        if(amount == 1){
+            toAddress = address;
         }
         let outputs: IPaymentOutput[] = [
             {
@@ -368,6 +377,7 @@ async function cancelTask(taskId: string) {
     if (job) {
         //const {status} = job.data;
         job.data.status = "cancel";
+        job.data.cancelnum = 0;
         await job.update(job.data);
         return 'Job canceled';
     }
