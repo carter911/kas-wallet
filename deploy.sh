@@ -1,5 +1,5 @@
 #!/bin/bash
-
+export HOME=/root
 # 定义变量
 REPO_DIR="./"
 WWW_DIR="./"
