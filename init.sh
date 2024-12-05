@@ -65,6 +65,12 @@ if [ ! -f "$CONFIG_FILE" ]; then
   exit 1
 fi
 
+
+if [ -d "src/Library" ]; then
+    echo "复制 Library 文件夹到 dist..."
+    cp -r src/Library dist/Library || { echo "Library 文件夹复制失败"; exit 1; }
+fi
+
 echo "使用 PM2 启动或重启应用..."
 pm2 start "$CONFIG_FILE" --env production
 
