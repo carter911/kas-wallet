@@ -98,7 +98,7 @@ async function updateProgress(job:Job,address,amount,status?:string){
         await job.update(job.data);
     }
     if(job.data.current == total && job.data.status != 'canceled'&& job.data.status != 'cancel'){
-        job.data.status = 'completed';
+        //job.data.status = 'completed';
         await job.update(job.data);
         await job.progress(100);
     }
@@ -278,7 +278,7 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
         job.data.status = 'canceled';
         await job.update(job.data);
         await job.progress(100);
-        return;
+        return true;
     }
     //避免进程启动过程中，重复提交任务
     if(!await redis.get("mint_task_send_"+job.id) ){
@@ -292,7 +292,6 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
             await redis.setex("mint_task_send_"+job.id,7*24*60*60,transactionId);
 
         }
-
     }
     let feeAmount = amount*feeRate*walletNumber;
     if(feeAmount<=0.22){

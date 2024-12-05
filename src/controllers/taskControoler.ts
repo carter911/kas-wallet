@@ -38,8 +38,9 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
             status: 'pending',
             notifyUrl,
         };
+
         const hash = crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex');
-        const job = await taskQueue.add(data, { jobId: hash });
+        const job = await taskQueue.add(data, { jobId: hash,removeOnComplete: true });
         await job.progress(0);
         // 返回任务ID以及提交确认
         res.status(202).json({
