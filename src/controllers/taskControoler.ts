@@ -3,7 +3,7 @@ import { taskQueue, getTaskMintStatus, cancelTask } from '../services/taskQueue'
 import Wallet from "../services/Wallet";
 const crypto = require('crypto');
 
-// 提交任务的控制器
+// mint
 export async function submitForm(req: Request, res: Response): Promise<void> {
     const { privateKey, ticker, gasFee, amount,walletNumber, network,notifyUrl } = req.body;
 
