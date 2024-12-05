@@ -71,4 +71,4 @@ else
 fi
 
 
-chmod +x deploy.sh
+chmod +x deploy-dev.sh
