@@ -82,4 +82,5 @@ pm2 save
 echo "当前 PM2 应用状态："
 pm2 list
 
+
 echo "脚本执行完毕！应用已启动并由 PM2 管理。"
