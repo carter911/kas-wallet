@@ -55,8 +55,6 @@ if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
     echo "编译 TypeScript..."
     npx tsc -p "$TS_CONFIG" || { echo "TypeScript 编译失败"; exit 1; }
 
-    # 检查端口占用
-    check_port
 
     # 检查 PM2 应用是否已存在
     echo "检查 PM2 应用状态..."
