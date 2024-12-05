@@ -33,4 +33,5 @@ try {
 } catch (error) {
     console.error('Error initializing RPC connection pool:', error);
 }
+
 export { rpcPool, taskQueue };
