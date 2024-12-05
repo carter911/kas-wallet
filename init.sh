@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 定义变量
-NODE_VERSION="16.9.1"
+NODE_VERSION="20.11.1"
 APP_NAME="kas-mint"  # 替换为你的应用名称
 APP_DIR="/var/www/$APP_NAME"  # 替换为你的应用路径
 CONFIG_FILE="ecosystem.config.js"  # PM2 配置文件路径
@@ -14,7 +14,7 @@ sudo apt install -y curl wget git build-essential
 
 # 安装 Node.js 指定版本
 echo "安装 Node.js $NODE_VERSION..."
-curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 npm install -g n
 
@@ -57,7 +57,8 @@ fi
 # 安装应用依赖
 echo "安装应用依赖..."
 npm install
-
+echo "编译安装..."
+npm build
 # 检查 PM2 配置文件
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "PM2 配置文件 $CONFIG_FILE 不存在！请检查后重新运行脚本。"
