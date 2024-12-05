@@ -58,14 +58,13 @@ if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
 
     # 检查 PM2 应用是否已存在
     echo "检查 PM2 应用状态..."
-    if pm2 list | grep -q "$APP_NAME"; then
+    if pm2 describe "$APP_NAME" > /dev/null 2>&1; then
         echo "应用已存在，重启应用..."
         pm2 restart "$APP_NAME" || { echo "PM2 重启失败"; exit 1; }
     else
         echo "应用未运行，尝试启动应用..."
-        pm2 start ecosystem.config.js --env production || { echo "PM2 启动失败"; exit 1; }
+        pm2 start ecosystem.config.js --name "$APP_NAME" --env production || { echo "PM2 启动失败"; exit 1; }
     fi
-
     echo "部署完成！"
 else
     echo "没有检测到更新，无需操作。"
