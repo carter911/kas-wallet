@@ -15,8 +15,8 @@ declare global {
 let taskQueue: any | null = null;
 try {
     const redisOptions: any = {
-        host: '127.0.0.1',
-        port: 6379,
+        host: process.env.REDIS_URL,
+        port: process.env.REDIS_PORT,
         password: '',
     };
     taskQueue = new Bull('mint-queue', redisOptions);

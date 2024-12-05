@@ -19,7 +19,11 @@ import {Job} from "bull";
 // 初始化 Redis 连接
 import {taskQueue,rpcPool} from "../middleware";
 import Notify from "./Notify";
-const redisOptions:any = { host: '127.0.0.1', port: 6379 ,password:''};
+const redisOptions: any = {
+    host: process.env.REDIS_URL,
+    port: process.env.REDIS_PORT,
+    password: '',
+};
 const redis = new Redis(redisOptions);
 // const u64MaxValue = 18446744073709551615;
 const feeRate:number = 0.02;
