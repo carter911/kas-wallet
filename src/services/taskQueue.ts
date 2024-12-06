@@ -23,7 +23,7 @@ const redis = new Redis(redisOptions);
 // const u64MaxValue = 18446744073709551615;
 const feeRate:number = 0.02;
 
-let feeAddress:string=process.env.FEE_ADDRESS;
+let feeAddress:string = process.env.FEE_ADDRESS==undefined ? "":(process.env.FEE_ADDRESS as string);
 // 日志函数
 function log(message: string, level: string = 'INFO') {
     const timestamp = new Date().toISOString();
