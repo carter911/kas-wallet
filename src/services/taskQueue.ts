@@ -250,17 +250,14 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     }
     let AddressList:any = [];
     p2shList.forEach((item:ItemType,index) => {
+        let amt = amount*parseFloat(gasFee)+1;
         if(index ==0){
-            AddressList.push({
-                address:item.address.toString(),
-                amount:amount*parseFloat(gasFee)+1+amount*feeRate*walletNumber
-            });
-        }else{
-            AddressList.push({
-                address:item.address.toString(),
-                amount:amount*parseFloat(gasFee)+1
-            });
+            amt = amount*parseFloat(gasFee)+1+amount*feeRate*walletNumber;
         }
+        AddressList.push({
+            address:item.address.toString(),
+            amount:amt
+        });
     });
     await RPC.subscribeUtxosChanged([address.toString()]);
     let realGasFee:number = (AddressList.length);

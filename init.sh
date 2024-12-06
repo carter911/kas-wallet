@@ -56,9 +56,9 @@ fi
 
 # 安装应用依赖
 echo "安装应用依赖..."
-npm install
+npm run install
 echo "编译安装..."
-npm build
+npm run build
 # 检查 PM2 配置文件
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "PM2 配置文件 $CONFIG_FILE 不存在！请检查后重新运行脚本。"
@@ -82,6 +82,6 @@ pm2 save
 echo "当前 PM2 应用状态："
 pm2 list
 
-
+pm2
 echo "脚本执行完毕！应用已启动并由 PM2 管理。"
 
