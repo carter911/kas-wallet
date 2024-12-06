@@ -11,14 +11,15 @@ declare global {
 }
 
 // Redis configuration
-
+const redisOptions: any = {
+    host: process.env.REDIS_URL,
+    port: process.env.REDIS_PORT,
+    password: '',
+    tls: process.env.REDIS_TLS,
+};
 let taskQueue: any | null = null;
 try {
-    const redisOptions: any = {
-        host: process.env.REDIS_URL,
-        port: process.env.REDIS_PORT,
-        password: '',
-    };
+
     taskQueue = new Bull('mint-queue', redisOptions);
     console.log('Task queue initialized successfully');
 } catch (error) {
@@ -34,4 +35,4 @@ try {
     console.error('Error initializing RPC connection pool:', error);
 }
 
-export { rpcPool, taskQueue };
+export { rpcPool, taskQueue,redisOptions };

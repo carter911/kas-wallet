@@ -17,19 +17,13 @@ type ItemType = {
 };
 import {Job} from "bull";
 // 初始化 Redis 连接
-import {taskQueue,rpcPool} from "../middleware";
+import {taskQueue,rpcPool,redisOptions} from "../middleware";
 import Notify from "./Notify";
-const redisOptions: any = {
-    host: process.env.REDIS_URL,
-    port: process.env.REDIS_PORT,
-    password: '',
-};
 const redis = new Redis(redisOptions);
 // const u64MaxValue = 18446744073709551615;
 const feeRate:number = 0.02;
 
-const feeAddressTest:string ="kaspatest:qpp2xdfehz4jya6pu5uq0vghvsf8g4xsa9hq4ua40lgfaktjdxhxgzylhyr9t";
-let feeAddress:string="kaspa:qz8n45r7fuzzax7ps98w5w9q2mf0wnhz2s32ktqx9zqmnxmsj0das788rxpwl";
+let feeAddress:string=process.env.FEE_ADDRESS;
 // 日志函数
 function log(message: string, level: string = 'INFO') {
     const timestamp = new Date().toISOString();
@@ -80,7 +74,6 @@ function sleep(seconds:number) {
 //     }
 //     return submittedTransactionId;
 // }
-
 
 
 async function updateProgress(job:Job,address,amount,status?:string){
@@ -269,9 +262,6 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
             });
         }
     });
-    if(process.env.KASPA_NETWORK =="testnet-10"){
-        feeAddress = feeAddressTest
-    }
     await RPC.subscribeUtxosChanged([address.toString()]);
     let realGasFee:number = (AddressList.length);
     if(walletNumber==1){

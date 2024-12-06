@@ -43,7 +43,7 @@ fi
 
 # 进入应用目录
 cd "$APP_DIR" || { echo "应用目录不存在！"; exit 1; }
-
+chmod +x deploy.sh
 # 获取或更新代码
 if [ -d ".git" ]; then
   echo "更新代码..."
@@ -84,3 +84,4 @@ pm2 list
 
 
 echo "脚本执行完毕！应用已启动并由 PM2 管理。"
+
