@@ -7,7 +7,7 @@ module.exports = {
             exec_mode: "cluster", // 使用 cluster 模式（推荐多实例时使用）
             watch: true, // 是否监听文件变化（适合开发环境）
             ignore_watch: ["node_modules", "logs"], // 忽略监听的文件或目录
-            max_memory_restart: "300M", // 内存占用超过 300MB 时重启
+            max_memory_restart: "600M", // 内存占用超过 300MB 时重启
             env: {
                 NODE_ENV: "production", // 默认环境变量，生产环境
                 PORT: 3000, // 应用监听端口
