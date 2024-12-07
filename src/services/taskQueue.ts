@@ -103,14 +103,15 @@ async function updateProgress(job:Job,address,amount,status?:string){
         await job.update(job.data);
         await job.progress(100);
     }
-    let state = await redis.get("mint_task_notify_"+job.id+job.id+job.data.status)
+    let key = "mint_task_notify_"+job.id+job.data.status;
+    let state = await redis.get(key)
     if(job.data.notifyUrl && !state){
+        await redis.setex(key, 5,1);
+        console.log(job.id,job.data.total,total,job.data.status);
         delete job.data.privateKey;
         let notify = new Notify();
         await notify.sendMessage(job.data.notifyUrl,job.data);
-        await redis.setex("mint_task_notify_"+job.id+job.data.status, 10,1);
     }
-    console.log(job.id,job.data.total,total,job.data.status);
 }
 // //找零归集
 // // P2SH 地址循环上链操作
