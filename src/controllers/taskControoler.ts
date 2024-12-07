@@ -44,7 +44,8 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
 
         const balance2 = parseFloat(balance.replace(/,/g, ''));
         console.log(balance,balance2);
-        if(balance2<(amount+gasFee)*walletNumber){
+
+        if(balance2<((amount*gasFee)+walletNumber)){
             res.status(400).json({ error: address+' :Insufficient balance' });
             return;
         }
