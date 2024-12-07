@@ -7,6 +7,30 @@ const crypto = require('crypto');
 export async function submitForm(req: Request, res: Response): Promise<void> {
     const { privateKey, ticker, gasFee, amount,walletNumber, network,notifyUrl } = req.body;
 
+    if (!privateKey || typeof privateKey!=="string") {
+        res.status(401).json({ error: 'privateKey is undefined, using default network.' });
+        return ;
+    }
+    if (!ticker || typeof ticker!=="string") {
+        res.status(401).json({ error: 'ticker is undefined,' });
+        return ;
+    }
+
+    if (!gasFee || typeof gasFee!=="number") {
+        res.status(401).json({ error: 'gasFee is undefined,' });
+        return ;
+    }
+
+    if (!walletNumber|| typeof walletNumber!=="number") {
+        res.status(401).json({ error: 'walletNumber is undefined' });
+        return ;
+    }
+
+    if (!amount|| typeof amount!=="number") {
+        console.warn('amount is undefined, using default network.');
+        res.status(401).json({ error: 'amount is undefined, using default network.' });
+        return ;
+    }
 
     try {
         if(req.pool==undefined){
