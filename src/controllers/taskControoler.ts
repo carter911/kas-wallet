@@ -92,6 +92,7 @@ export async function getStatus(req: Request, res: Response): Promise<void> {
     }
 }
 
+
 // 取消任务
 export async function cancel(req: Request, res: Response): Promise<void> {
     const { taskId } = req.query;
