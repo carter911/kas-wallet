@@ -80,9 +80,11 @@ function sleep(seconds:number) {
 async function updateProgress(job:Job,address,amount,status?:string){
     await redis.hset("mint_task_status_"+job.id,address,amount);
     await redis.expire("mint_task_status_"+job.id, 3600*24*7);
-    const list = await redis.hgetall("mint_task_status_"+job.id)
+    const list = await redis.hgetall("mint_task_status_"+job.id);
     const total = Object.values(list).reduce((sum, value) => sum + parseInt(value, 10), 0);
-    console.log(job.id,job.data.total,total);
+    if(Object.values(list).length!=job.data.walletNumber){
+        return false;
+    }
     job.data.current = job.data.total-total;
     await job.update(job.data);
     if(status){
@@ -96,18 +98,19 @@ async function updateProgress(job:Job,address,amount,status?:string){
         }
         await job.update(job.data);
     }
-    if(job.data.current == total && job.data.status != 'canceled'&& job.data.status != 'cancel'){
-        //job.data.status = 'completed';
+    if(job.data.current == job.data.total){
+        job.data.status = 'completed';
         await job.update(job.data);
         await job.progress(100);
     }
-    let state = await redis.get("mint_task_notify_"+job.id)
+    let state = await redis.get("mint_task_notify_"+job.id+job.id+job.data.status)
     if(job.data.notifyUrl && !state){
         delete job.data.privateKey;
         let notify = new Notify();
         await notify.sendMessage(job.data.notifyUrl,job.data);
-        await redis.setex("mint_task_notify_"+job.id, 10,1);
+        await redis.setex("mint_task_notify_"+job.id+job.data.status, 10,1);
     }
+    console.log(job.id,job.data.total,total,job.data.status);
 }
 // //找零归集
 // // P2SH 地址循环上链操作
@@ -320,9 +323,10 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     }
 
 
-    job.data.status = "mint";
-    await job.update(job.data);
-
+    if(job.data.status!="cancel"){
+        job.data.status = "mint";
+        await job.update(job.data);
+    }
     const tasks = p2shList.map(async (item:ItemType,index) => {
         // P2SH 地址循环上链操作
         let feeInfo :any = {
@@ -356,7 +360,6 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
     let mintTotal = amount;
     console.log('------------------>',index,amount);
     while (amount>0){
-
         const taskStatus =await getTaskStatus(job.id);
         const { entries: entries } = await RPC.getUtxosByAddresses({ addresses: [P2SHAddress] });
         if (entries.length === 0) {

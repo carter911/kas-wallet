@@ -36,6 +36,7 @@ process.on('SIGINT', async () => {
         if(rpcPool){
             await rpcPool.closeAll(); // Clean up RPC connections
         }
+        taskQueue.
         console.log('RPC connections closed');
     } catch (error) {
         console.error('Error closing RPC connections:', error);
