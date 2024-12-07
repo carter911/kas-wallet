@@ -24,7 +24,7 @@ class Krc {
             return response.data.result;
         } catch (error) {
             console.error(`Error fetching data for token list`, error);
-            throw error;
+            //throw error;
         }
     }
 

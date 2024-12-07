@@ -445,7 +445,7 @@ async function cancelTask(taskId: string) {
     return 'Job not found';
 }
 
-// 任务处理器
+// 任务处理器 单独任务及出
 taskQueue.process(50,async (job) => {
     console.log("taskQueue processing \n");
     const { privateKey, ticker, gasFee, amount,walletNumber} = job.data;
