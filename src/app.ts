@@ -7,12 +7,7 @@ const env = process.env.NODE_ENV || 'development';
 dotenv.config({ path: `.env.${env}` });
 // Global WebSocket setup
 globalThis.WebSocket = require('websocket').w3cwebsocket;
-
-
 import {rpcPool,taskQueue} from "./middleware";
-
-
-
 app.use((req, _, next) => {
     try {
         req.pool = rpcPool;
