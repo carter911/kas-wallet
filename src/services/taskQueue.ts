@@ -82,6 +82,7 @@ async function updateProgress(job:Job,address,amount,status?:string){
     await redis.expire("mint_task_status_"+job.id, 3600*24*7);
     const list = await redis.hgetall("mint_task_status_"+job.id)
     const total = Object.values(list).reduce((sum, value) => sum + parseInt(value, 10), 0);
+    console.log(job.id,job.data.total,total);
     job.data.current = job.data.total-total;
     await job.update(job.data);
     if(status){
