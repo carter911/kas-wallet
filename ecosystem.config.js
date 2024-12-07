@@ -14,7 +14,7 @@ module.exports = {
             },
             env_development: {
                 NODE_ENV: "development", // 开发环境变量
-                PORT: 3001,
+                PORT: 3000,
             },
         },
     ],

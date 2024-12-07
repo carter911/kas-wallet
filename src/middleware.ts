@@ -11,15 +11,16 @@ declare global {
 }
 
 // Redis configuration
-const redisOptions: any = {
+let redisOptions: any = {
     host: process.env.REDIS_URL,
     port: process.env.REDIS_PORT,
     password: '',
-    tls: process.env.REDIS_TLS,
 };
+if(process.env.REDIS_TLS){
+    redisOptions.tls = process.env.REDIS_TLS;
+}
 let taskQueue: any | null = null;
 try {
-
     taskQueue = new Bull('mint-queue', redisOptions);
     console.log('Task queue initialized successfully');
 } catch (error) {

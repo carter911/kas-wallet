@@ -14,6 +14,7 @@ type ItemType = {
     address: string;
     script: ScriptBuilder;
     publicKey: string;
+    amount:number;
 };
 import {Job} from "bull";
 // 初始化 Redis 连接
@@ -232,6 +233,26 @@ async function updateProgress(job:Job,address,amount,status?:string){
 //     await RPC.disconnect();
 //     return { status: 'success' };
 // }
+function distributeTasks(totalTasks, walletCount) {
+    const tasks = Array(walletCount).fill(0);
+
+    // 基础分配，每个钱包分配 floor(totalTasks / walletCount)
+    const baseAllocation = Math.floor(totalTasks / walletCount);
+
+    // 多出来的操作需要分配给前面的钱包
+    let remainder = totalTasks % walletCount;
+
+    // 分配任务
+    for (let i = 0; i < walletCount; i++) {
+        tasks[i] = baseAllocation;
+        if (remainder > 0) {
+            tasks[i]++;
+            remainder--;
+        }
+    }
+
+    return tasks;
+}
 
 // 提交任务的逻辑实现
 async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: string, amount: number,walletNumber: number,job:Job) {
@@ -243,21 +264,31 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     const p2shList:any = []; // 存储所有 P2SH 地址
     log(`main addresses for ticker: ${wallet.getAddress()}`, 'INFO');
 
+    let amountList = distributeTasks(amount,walletNumber);
+
     for(var i=0;i<walletNumber;i++){
         const data = wallet.mintOP(ticker,i,address.toString());
         const p2shInfo = wallet.makeP2shAddress(privateKeyArg.toString(),data);
         p2shList.push(p2shInfo);
     }
+
+    let feeAmount = amount*feeRate;
+    if(feeAmount<=0.22){
+        feeAmount = 0.22;
+    }
+
     let AddressList:any = [];
     p2shList.forEach((item:ItemType,index) => {
-        let amt = amount*parseFloat(gasFee)+1;
+        let amt = amountList[index]*parseFloat(gasFee)+1;
         if(index ==0){
-            amt = amount*parseFloat(gasFee)+1+amount*feeRate*walletNumber;
+            //第一个地址扣费用
+            amt = amt+feeAmount;
         }
         AddressList.push({
             address:item.address.toString(),
             amount:amt
         });
+        p2shList[index].amount = amountList[index];
     });
     await RPC.subscribeUtxosChanged([address.toString()]);
     let realGasFee:number = (AddressList.length);
@@ -271,6 +302,8 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
         await job.progress(100);
         return true;
     }
+
+
     //避免进程启动过程中，重复提交任务
     if(!await redis.get("mint_task_send_"+job.id) ){
         job.data.status = "send";
@@ -284,10 +317,7 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
 
         }
     }
-    let feeAmount = amount*feeRate*walletNumber;
-    if(feeAmount<=0.22){
-        feeAmount = 0.22;
-    }
+
 
     job.data.status = "mint";
     await job.update(job.data);
@@ -299,12 +329,17 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
             amount:kaspaToSompi(feeAmount.toString())!
         }
         await RPC.subscribeUtxosChanged([item.address.toString()]);
-        await loopOnP2SHV2(RPC,connection, item.address, amount, gasFee.toString(), privateKey, item.script,job,address,index,feeInfo);
-        await RPC.unsubscribeUtxosChanged([item.address.toString()]);
+        try {
+            await loopOnP2SHV2(RPC,connection, item.address, item.amount, gasFee.toString(), privateKey, item.script,job,address,index,feeInfo);
+            console.log('--------------------------->',index)
+        } finally {
+            await RPC.unsubscribeUtxosChanged([item.address.toString()]);
+        }
+
     });
 
     // 等待所有任务完成
-    await Promise.all(tasks);
+    await Promise.allSettled(tasks);
     log('Transaction successfully processed.', 'INFO');
     await RPC.disconnect();
     return { status: 'success' };
@@ -320,6 +355,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
     let mintTotal = amount;
     console.log('------------------>',index,amount);
     while (amount>0){
+
         const taskStatus =await getTaskStatus(job.id);
         const { entries: entries } = await RPC.getUtxosByAddresses({ addresses: [P2SHAddress] });
         if (entries.length === 0) {
@@ -359,9 +395,9 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             updateProgress(job,P2SHAddress,amount);
             return submittedTransactionId.transactionId;
         }).catch((error) => {
-            console.log('error----------------------->',error);
             errorIndex++;
             if(errorIndex>8){
+                console.log('error----------------------->',error);
                 amount =0
             }
         });
