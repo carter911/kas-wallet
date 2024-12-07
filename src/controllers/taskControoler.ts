@@ -33,7 +33,7 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
             walletNumber,
             amount,
             network,
-            total:amount*walletNumber,
+            total:amount,
             current:0,
             status: 'pending',
             notifyUrl,
