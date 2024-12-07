@@ -31,7 +31,6 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
         res.status(401).json({ error: 'amount is undefined, using default network.' });
         return ;
     }
-
     try {
         if(req.pool==undefined){
             console.log(11);
