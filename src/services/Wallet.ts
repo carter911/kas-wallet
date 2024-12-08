@@ -17,6 +17,7 @@ type ItemType = {
     script: ScriptBuilder;
     publicKey: string;
 };
+const MAX_RETRIES = 20; // 最大重试次数
 class Wallet {
     private privateKeyObj: PrivateKey;
     private network: string;
@@ -77,15 +78,21 @@ class Wallet {
     }
 
     // Send KAS
-    async send(toAddress: string, amount: number, gasFee: number=0.00002) {
+    async send(toAddress: string, amount: number, gasFee: number=0.00000) {
         const RPC = await this.RpcConnection.getRpcClient();
         const address = this.getAddress();
         const UTXO = await RPC.getUtxosByAddresses({ addresses: [address.toString()] });
+        // UTXO.entries.forEach(function (item,index){
+        //     console.log(sompiToKaspaString(item.amount),index);
+        // })
+
+
         const output: IPaymentOutput = {
             address: toAddress,
             amount: kaspaToSompi(amount.toString())!
         };
         const { transactions: transactions } = await createTransactions({
+            priorityEntries:UTXO.entries,
             entries: UTXO.entries,
             outputs: [output],
             changeAddress: address.toString(),
@@ -95,6 +102,8 @@ class Wallet {
 
         let hash: any;
         for (const transaction of transactions) {
+            //let fee = calculateTransactionFee(this.network,[transaction],1);
+            //console.log(fee);
             transaction.sign([this.privateKeyObj], false);
             hash = await transaction.submit(RPC);
             console.log(hash);
@@ -121,6 +130,7 @@ class Wallet {
             networkId: this.network
         });
 
+
         let hash: any;
         for (const transaction of transactions) {
             transaction.sign([this.privateKeyObj], false);
@@ -134,6 +144,7 @@ class Wallet {
         const RPC = await this.RpcConnection.getRpcClient();
         const { entries: entries } = await RPC.getUtxosByAddresses({ addresses: [address] });
         if (entries.length === 0) {
+            console.log('entries.length === 0');
             return;
         }
         let total = entries.reduce((agg, curr) => {
@@ -142,7 +153,7 @@ class Wallet {
 
         const changeAddress = change || address;
         console.log(amount);
-        const safeGasFee = gasFee ?? "0"; // Use "0" or another appropriate fallback value
+        const safeGasFee = gasFee ?? "0.00002"; // Use "0" or another appropriate fallback value
         const safeTotal = total ?? 0; // Default to 0 if `total` is `undefined`
         const outputs: IPaymentOutput[] = [
             {
@@ -156,6 +167,7 @@ class Wallet {
             transaction.inputs[index].signatureScript = script.encodePayToScriptHashSignatureScript(signature);
         })
         const submittedTransactionId = await RPC.submitTransaction({transaction}).then(function (submittedTransactionId) {
+            console.log(submittedTransactionId);
             return submittedTransactionId.transactionId;
         }).catch((error) => {
             console.log('error----------------------->',error);
@@ -172,12 +184,12 @@ class Wallet {
         return {p: 'krc-20', op: 'transfer', tick: ticker, amt: amt.toString(), to: address.toString(),};
     }
 
-    public deployOP(ticket:string,max:string,lim:string,to?:string,dec:number=8,pre?:number){
+    public deployOP(ticket:string,max:string,lim:string,to?:string,dec:string="8",pre?:string){
         return {p: "krc-20",op: "deploy",tick: ticket,max: max,lim:lim,to:to,dec: dec,pre: pre};
     }
 
     public listOP(ticket:string,amt:string){
-        return {p:'krc-20',op:"list",tick:ticket,amt:amt.toString()};
+        return {p:'krc-20',op:"list",tick:ticket,amt:amt};
     }
 
     public sendOP(){
@@ -230,9 +242,12 @@ class Wallet {
         }
     }
 
+
+
+
     public async mint(tick:string,amount:number,gasFee:number,address?:string):Promise<{transactionId:string,revealTransactionId:string}>{
         try {
-            const MAX_RETRIES = 20; // 最大重试次数
+
             const index =1;
             if(address ==undefined || address==""){
                 address = this.getAddress();
@@ -292,23 +307,40 @@ class Wallet {
         return new Promise(resolve => setTimeout(resolve, seconds * 1000));
     }
 
-    public async market(tick:string,address:string,amount:string,gasFee:number):Promise<{transactionId:string,revealTransactionId:string}>{
+    public async market(tick:string,amount:string,gasFee:number):Promise<{transactionId:string,revealTransactionId:string}>{
         try {
-            console.log(address)
-            const data = this.listOP(tick,amount);
-            const P2SHAddress = this.makeP2shAddress(this.privateKeyObj.toString(),data);
-            const transactionId = await this.send(P2SHAddress.address, 3, gasFee);
-            const sendData = this.sendOP();
-            const SendP2SHAddress = this.makeP2shAddress(this.privateKeyObj.toString(),sendData);
-            const revealTransactionId = await this.reveal(P2SHAddress.address, parseFloat(amount)-gasFee, gasFee, SendP2SHAddress.script);
-            return {transactionId:transactionId.toString(),revealTransactionId:revealTransactionId!.toString()};
+            const P2SHAddress = this.makeP2shAddress(this.privateKeyObj.toString(),this.listOP(tick,amount));
+            const RPC = await this.RpcConnection.getRpcClient();
+            await RPC.subscribeUtxosChanged([P2SHAddress.address.toString()]);
+
+            if(!gasFee){
+                gasFee = 0.0002;
+            }
+            const transactionId = await this.retryRequest(async () => {
+                return await this.send(P2SHAddress.address.toString(), 3, gasFee);
+            }, MAX_RETRIES, "send transaction");
+            //const transactionId = await this.send(P2SHAddress.address, 3);
+            await this.RpcConnection.listenForUtxoChanges(P2SHAddress.address,transactionId.toString());
+            await RPC.unsubscribeUtxosChanged([P2SHAddress.address.toString()]);
+
+            //reveal
+            const SendP2SHAddress = this.makeP2shAddress(this.privateKeyObj.toString(),this.sendOP());
+            await RPC.subscribeUtxosChanged([SendP2SHAddress.address.toString()]);
+            const revealTransactionId = await this.retryRequest(async () => {
+                return await this.reveal(P2SHAddress.address, 3-gasFee, gasFee, P2SHAddress.script,SendP2SHAddress.address);
+            }, MAX_RETRIES, "reveal transaction");
+            if(revealTransactionId){
+                await this.RpcConnection.listenForUtxoChanges(SendP2SHAddress.address,revealTransactionId.toString());
+            }
+            await RPC.unsubscribeUtxosChanged([SendP2SHAddress.address.toString()]);
+            return {transactionId:transactionId!.toString(),revealTransactionId:revealTransactionId!.toString()};
         }catch (e) {
             console.log(e);
             return {transactionId:'',revealTransactionId:''};
         }
     }
 
-    public async deploy(tick:string,max:string,lim:string,to:string,gasFee:number,dec:number=8):Promise<{transactionId:string,revealTransactionId:string}>{
+    public async deploy(tick:string,max:string,lim:string,to:string,gasFee:number,dec:string="8"):Promise<{transactionId:string,revealTransactionId:string}>{
         try {
             const data = this.deployOP(tick,max,lim,to,dec);
             const P2SHAddress = this.makeP2shAddress(this.privateKeyObj.toString(),data);
