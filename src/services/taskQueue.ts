@@ -17,10 +17,16 @@ type ItemType = {
     amount:number;
 };
 import {Job} from "bull";
+import Redlock from "redlock";
 // 初始化 Redis 连接
 import {taskQueue,rpcPool,redisOptions} from "../middleware";
 import Notify from "./Notify";
 const redis = new Redis(redisOptions);
+const redlock = new Redlock([redis], {
+    retryCount: 10,          // 重试次数
+    retryDelay: 300,         // 重试间隔（毫秒）
+});
+
 // const u64MaxValue = 18446744073709551615;
 const feeRate:number = 0.02;
 
@@ -77,7 +83,10 @@ function sleep(seconds:number) {
 // }
 
 
+
 async function updateProgress(job:Job,address,amount,status?:string){
+
+
     await redis.hset("mint_task_status_"+job.id,address,amount);
     await redis.expire("mint_task_status_"+job.id, 3600*24*7);
     const list = await redis.hgetall("mint_task_status_"+job.id);
@@ -103,8 +112,15 @@ async function updateProgress(job:Job,address,amount,status?:string){
         await job.update(job.data);
         await job.progress(100);
     }
+
+    //分布式锁
+    const resource = 'locks:example'; // 锁的资源标识
+    const ttl = 1000;                 // 锁的过期时间（毫秒）
+    const lock = await redlock.acquire([resource], ttl);
+
+    //限制发送频率
     let key = "mint_task_notify_"+job.id+job.data.status;
-    let state = await redis.get(key)
+    let state = await redis.get(key);
     if(job.data.notifyUrl && !state){
         await redis.setex(key, 5,1);
         console.log(job.id,job.data.total,total,job.data.status);
@@ -112,6 +128,8 @@ async function updateProgress(job:Job,address,amount,status?:string){
         let notify = new Notify();
         await notify.sendMessage(job.data.notifyUrl,job.data);
     }
+    await lock.release();
+
 }
 // //找零归集
 // // P2SH 地址循环上链操作
