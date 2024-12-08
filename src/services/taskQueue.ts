@@ -480,6 +480,10 @@ taskQueue.process(50,async (job) => {
 
     } catch (error) {
         log(`Error processing task: ${error}`, 'ERROR');
+        if (error instanceof Error) {
+            console.error("Stack trace:", error.stack);
+        }
+
         throw error;
     }
 });

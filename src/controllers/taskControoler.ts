@@ -37,7 +37,7 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
             return ;
         }
         const connection = await req.pool.getConnection();
-        const wallet = new Wallet(privateKey.toString(),connection);
+        const wallet = new Wallet(privateKey,connection);
         const address = wallet.getAddress();
         const balance = await wallet.getBalance();
 
@@ -62,12 +62,12 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
             status: 'pending',
             notifyUrl,
         };
-
-        const hash = crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex');
+        const timestamp = Math.floor(Date.now() / 1000);
+        const hash = crypto.createHash('sha256').update(JSON.stringify(data)+timestamp).digest('hex');
         const job = await taskQueue.add(data, { jobId: hash,removeOnComplete: true });
         await job.progress(0);
         // 返回任务ID以及提交确认
-        res.status(202).json({
+        res.status(200).json({
             message: "Task is being processed",
             taskId: job.id,
         });
