@@ -19,6 +19,7 @@ let redisOptions: any = {
 if(process.env.REDIS_TLS){
     redisOptions.tls = process.env.REDIS_TLS;
 }
+
 let taskQueue: any | null = null;
 try {
     taskQueue = new Bull('mint-queue', redisOptions);
