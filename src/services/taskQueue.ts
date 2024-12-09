@@ -5,7 +5,7 @@ import {
     kaspaToSompi,
     IPaymentOutput,
     createTransaction,
-    createInputSignature,
+    createInputSignature, sompiToKaspaString,
 } from '../Library/wasm/kaspa';
 import Wallet from "./Wallet";
 import RpcConnection from "./RpcConnection";
@@ -117,16 +117,16 @@ async function updateProgress(job:Job,address,amount,status?:string){
     const resource = 'locks:example'; // 锁的资源标识
     const ttl = 1000;                 // 锁的过期时间（毫秒）
     const lock = await redlock.acquire([resource], ttl);
-
     //限制发送频率
     let key = "mint_task_notify_"+job.id+job.data.status;
     let state = await redis.get(key);
     if(job.data.notifyUrl && !state){
         await redis.setex(key, 5,1);
         console.log(job.id,job.data.total,total,job.data.status);
-        delete job.data.privateKey;
+        let info = job.data;
+        delete info.privateKey;
         let notify = new Notify();
-        await notify.sendMessage(job.data.notifyUrl,job.data);
+        await notify.sendMessage(job.data.notifyUrl,info);
     }
     await lock.release();
 
@@ -301,6 +301,7 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     }
 
     let AddressList:any = [];
+
     p2shList.forEach((item:ItemType,index) => {
         let amt = amountList[index]*parseFloat(gasFee)+1;
         if(index ==0){
@@ -337,7 +338,6 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
                 console.log('---------->main \n',error);
             });
             await redis.setex("mint_task_send_"+job.id,7*24*60*60,transactionId);
-
         }
     }
 
@@ -368,21 +368,67 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     await RPC.disconnect();
     return { status: 'success' };
 }
+type REFERER = {
+    lv1_address: string;
+    lv1_rate: number;
+    lv2_address: string;
+    lv2_rate: number;
+};
+function processReferer(
+    referer: REFERER,
+    feeAmount: number,
+    outputs:IPaymentOutput[],
+    threshold = 0.22
+) {
+    const processLevel = (
+        address: string | undefined,
+        rate: number | undefined
+    ) => {
+        let amount:bigint = 0n;
+        if (address && typeof address === "string" && rate && typeof rate === "number") {
+            const amountInKaspa = parseFloat(sompiToKaspaString(feeAmount)) * rate;
+            if (amountInKaspa >= threshold) {
+                const amountInSompi = kaspaToSompi(amountInKaspa.toString());
+                if (amountInSompi !== undefined) {
+                    amount = amountInSompi;
+                    outputs.push({
+                        address,
+                        amount: amountInSompi,
+                    });
+                }
+            }
+        }
+        return amount;
+    };
+
+    let amountLv1:bigint = processLevel(referer.lv1_address, referer.lv1_rate);
+    let amountLv2:bigint = processLevel(referer.lv2_address, referer.lv2_rate);
+    return {amountLv1,amountLv2}
+}
 
 async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, amountNum: number, gasFee: string, privateKey: PrivateKey,script:ScriptBuilder,job:Job,address,index:number,feeInfo:any) {
     let errorIndex=0;
     let cacheNum:string|null = await redis.hget("mint_task_status_"+job.id,P2SHAddress);
     let amount:number = amountNum;
+
+    let isFirst:boolean = true;
+    //说明不是第一次进来
+    if(cacheNum!=null && parseInt(cacheNum) != amountNum){
+        isFirst = false
+    }
+
     if(cacheNum !== null){
         amount = parseInt(cacheNum);
     }
+
     let mintTotal = amount;
     console.log('------------------>',index,amount);
-    while (amount>0){
+    let flag = true;
+    while (amount>0 && flag){
         const taskStatus =await getTaskStatus(job.id);
         const { entries: entries } = await RPC.getUtxosByAddresses({ addresses: [P2SHAddress] });
         if (entries.length === 0) {
-            return;
+            flag = false;
         }
         let total = entries.reduce((agg, curr) => {
             return curr.amount + agg;
@@ -391,7 +437,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
         if(taskStatus =='cancel'){
             await updateProgress(job,P2SHAddress,amount,'canceled');
             toAddress = address;
-            amount=1;
+            flag = false;
         }
         if(amount == 1){
             toAddress = address;
@@ -402,11 +448,17 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
                 amount: total - kaspaToSompi(gasFee)!
             }
         ];
-        //fee
-        if(index == 0 && amount == mintTotal){
+        //第一个钱包 并且是第一次mint
+        if(index == 0 && amount == mintTotal && isFirst){
+            const referer: REFERER = job.data.referer;
+            let refererAmount = processReferer(referer, feeInfo.amount, outputs);
+            // 扣除总费用
             outputs[0].amount = total - kaspaToSompi(gasFee)!-feeInfo.amount;
+            //扣除代理费用
+            feeInfo.amount = feeInfo.amount-refererAmount.amountLv1-refererAmount.amountLv2;
             outputs.push(feeInfo);
         }
+
         const transaction = createTransaction(entries, outputs,kaspaToSompi(gasFee)!, "", 1);
         transaction.inputs.forEach((_,index) => {
             let signature = createInputSignature(transaction, index, privateKey, SighashType.All);
@@ -421,7 +473,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             errorIndex++;
             if(errorIndex>8){
                 console.log('error----------------------->',error);
-                amount =0
+                flag = false
             }
         });
         if(submittedTransactionId){
@@ -450,7 +502,7 @@ async function getTaskMintStatus(taskId: string|number) {
     }
     const {status} = job.data;
     const list = await redis.hgetall("mint_task_status_"+job.id);
-    let info = job.data;
+    const info = { ...job.data }; // 克隆对象
     delete info.privateKey;
     return {list:list,status:status,taskInfo:info};
 }

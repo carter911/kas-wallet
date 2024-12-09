@@ -2,10 +2,9 @@ import { Request, Response } from 'express';
 import { taskQueue, getTaskMintStatus, cancelTask } from '../services/taskQueue';
 import Wallet from "../services/Wallet";
 const crypto = require('crypto');
-
 // mint
 export async function submitForm(req: Request, res: Response): Promise<void> {
-    const { privateKey, ticker, gasFee, amount,walletNumber, network,notifyUrl } = req.body;
+    const { privateKey, ticker, gasFee, amount,walletNumber, network,notifyUrl,refererInfo } = req.body;
 
     if (!privateKey || typeof privateKey!=="string") {
         res.status(401).json({ error: 'privateKey is undefined, using default network.' });
@@ -30,6 +29,10 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
         console.warn('amount is undefined, using default network.');
         res.status(401).json({ error: 'amount is undefined, using default network.' });
         return ;
+    }
+    let referer = undefined;
+    if(refererInfo){
+        referer = refererInfo;
     }
     try {
         if(req.pool==undefined){
@@ -61,6 +64,7 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
             current:0,
             status: 'pending',
             notifyUrl,
+            referer,
         };
         const timestamp = Math.floor(Date.now() / 1000);
         const hash = crypto.createHash('sha256').update(JSON.stringify(data)+timestamp).digest('hex');
