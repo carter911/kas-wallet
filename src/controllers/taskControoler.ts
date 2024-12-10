@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { taskQueue, getTaskMintStatus, cancelTask } from '../services/taskQueue';
+import {getTaskMintStatus, cancelTask } from '../services/taskQueue';
+import {taskQueue} from "../middleware";
 import Wallet from "../services/Wallet";
 const crypto = require('crypto');
 // mint
