@@ -130,7 +130,6 @@ async function updateProgress(job:Job,address,amount,status?:string){
     await lock.release();
 
 }
-
 // //找零归集
 // // P2SH 地址循环上链操作
 // async function loopOnP2SH(connection: RpcConnection, P2SHAddress: string, amount: number, gasFee: string, privateKey: PrivateKey,script:ScriptBuilder,job:Job,address) {
