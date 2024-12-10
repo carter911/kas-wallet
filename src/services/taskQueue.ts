@@ -121,7 +121,7 @@ async function updateProgress(job:Job,address,amount,status?:string){
     //限制发送频率
     let key = "mint_task_notify_"+job.id+job.data.status;
     let state = await redis.get(key);
-    //console.log(job.id,job.data.total,total,job.data.status);
+    console.log(job.id,job.data.total,total,job.data.status);
     if(job.data.notifyUrl && !state){
         await redis.setex(key, 5,1);
         console.log(job.id,job.data.total,total,job.data.status);
