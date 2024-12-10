@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Wallet from '../services/Wallet';
 import Keys from '../services/Keys';
 import Krc from '../services/Krc';
+import {parseAmount,formatAmount} from "../services/Misc";
 //  获取钱包地址
 export async function generateAddress(req: Request, res: Response): Promise<void> {
     const {password } = req.body;
@@ -138,13 +139,21 @@ export async function transfer(req: Request, res: Response): Promise<void> {
     try {
         const connection = await req.pool.getConnection();
         const wallet = new Wallet(privateKey.toString(),connection);
-        const sendAmount = amount*100000000;
+
         const sendAddress = wallet.getAddress();
-        await new Krc().getTickList(sendAddress).then((info)=>{
-            if(info.balance<sendAmount){
+        let sendAmount:string = "";
+            await new Krc().getTickBalance(sendAddress,ticker).then((info)=>{
+                console.log(info.balance.toString(),info.dec);
+            let balance = parseAmount(info.balance.toString(),info.dec)
+            if(balance<amount){
                 throw new Error("Insufficient balance");
             }
+            sendAmount = formatAmount(amount.toString(),info.dec);
+        }).catch((error)=>{
+            console.log(error);
+            throw new Error("Insufficient balance");
         });
+
         const transactionId = await wallet.transfer(ticker.toString(),address.toString(),sendAmount,gasFee);
         res.status(200).json({transactionId:transactionId});
     } catch (error: any) {

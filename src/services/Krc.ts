@@ -31,10 +31,11 @@ class Krc {
     public async getTickBalance(address:string,tick:string) {
         try {
             const url = `${this.baseUrl}/address/${address}/token/${tick}`;
-            console.log(url)
             const response = await axios.get(url);
-            console.log(response);
-            return response.data.result;
+            let data = response.data.result;
+            if(data && data[0] && data[0].balance){
+                return data[0];
+            }
         } catch (error) {
             console.error(`Error fetching data for token list`, error);
             throw error;

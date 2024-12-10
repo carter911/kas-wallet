@@ -23,8 +23,10 @@ import {taskQueue,rpcPool,redisOptions} from "../middleware";
 import Notify from "./Notify";
 const redis = new Redis(redisOptions);
 const redlock = new Redlock([redis], {
-    retryCount: 10,          // 重试次数
-    retryDelay: 300,         // 重试间隔（毫秒）
+    driftFactor: 0.01, // 漂移因子
+    retryCount: 10,    // 重试次数
+    retryDelay: 200,   // 每次重试之间的时间（ms）
+    retryJitter: 50,   // 重试抖动时间（ms）
 });
 
 // const u64MaxValue = 18446744073709551615;
@@ -113,18 +115,20 @@ async function updateProgress(job:Job,address,amount,status?:string){
     }
 
     //分布式锁
-    const resource = 'locks:example'; // 锁的资源标识
-    const ttl = 1000;                 // 锁的过期时间（毫秒）
+    const resource = 'locks:example'+job.id; // 锁的资源标识
+    const ttl = 5000;                 // 锁的过期时间（毫秒）
     const lock = await redlock.acquire([resource], ttl);
     //限制发送频率
     let key = "mint_task_notify_"+job.id+job.data.status;
     let state = await redis.get(key);
+    console.log(job.id,job.data.total,total,job.data.status);
     if(job.data.notifyUrl && !state){
         await redis.setex(key, 5,1);
         console.log(job.id,job.data.total,total,job.data.status);
         let info = job.data;
         delete info.privateKey;
         let notify = new Notify();
+
         await notify.sendMessage(job.data.notifyUrl,info);
     }
     await lock.release();
@@ -287,7 +291,6 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     log(`main addresses for ticker: ${wallet.getAddress()}`, 'INFO');
 
     let amountList = distributeTasks(amount,walletNumber);
-
     for(var i=0;i<walletNumber;i++){
         const data = wallet.mintOP(ticker,i,address.toString());
         const p2shInfo = wallet.makeP2shAddress(privateKeyArg.toString(),data);
@@ -314,9 +317,12 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
         p2shList[index].amount = amountList[index];
     });
     await RPC.subscribeUtxosChanged([address.toString()]);
-    let realGasFee:number = (AddressList.length);
+
+    let realGasFee:number = AddressList.length*0.6;
     if(walletNumber==1){
         realGasFee = 0.0004;
+    }else if(walletNumber>5){
+        realGasFee = AddressList.length*1;
     }
     //取消任务
     if(job.data.status =='cancel'){
@@ -421,7 +427,6 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
     }
 
     let mintTotal = amount;
-    console.log('------------------>',index,amount);
     let flag = true;
     while (amount>0 && flag){
         const taskStatus =await getTaskStatus(job.id);
@@ -538,6 +543,5 @@ taskQueue.process(50,async (job) => {
         throw error;
     }
 });
-
 
 export { taskQueue, submitTaskV2, getTaskMintStatus, cancelTask };
