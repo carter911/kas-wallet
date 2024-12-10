@@ -128,7 +128,6 @@ async function updateProgress(job:Job,address,amount,status?:string){
         let info = job.data;
         delete info.privateKey;
         let notify = new Notify();
-
         await notify.sendMessage(job.data.notifyUrl,info);
     }
     await lock.release();
@@ -318,7 +317,7 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     });
     await RPC.subscribeUtxosChanged([address.toString()]);
 
-    let realGasFee:number = AddressList.length*0.6;
+    let realGasFee:number = AddressList.length*1;
     if(walletNumber==1){
         realGasFee = 0.0004;
     }else if(walletNumber>5){
