@@ -76,11 +76,11 @@ export async function balance(req: Request, res: Response): Promise<void> {
         const balance = await wallet.getBalance();
         const Krc20 = new Krc();
         const ticks = await Krc20.getTickList(address.toString());
-        if(ticks){
-            ticks.forEach(function (tick,index){
-                ticks[index].balance = parseAmount(tick.balance.toString(),tick.dec)
-            });
-        }
+        // if(ticks){
+        //     ticks.forEach(function (tick,index){
+        //         ticks[index].balance = parseAmount(tick.balance.toString(),tick.dec)
+        //     });
+        // }
         res.status(200).json({balance:balance,ticks:ticks});
     } catch (error: any) {
         res.status(500).json({error: error.message});
