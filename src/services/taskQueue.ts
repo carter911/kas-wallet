@@ -121,11 +121,11 @@ async function updateProgress(job:Job,address,amount,status?:string){
     //限制发送频率
     let key = "mint_task_notify_"+job.id+job.data.status;
     let state = await redis.get(key);
-    console.log(job.id,job.data.total,total,job.data.status);
+    //console.log(job.id,job.data.total,total,job.data.status);
     if(job.data.notifyUrl && !state){
         await redis.setex(key, 5,1);
         console.log(job.id,job.data.total,total,job.data.status);
-        let info = job.data;
+        let info = { ...job.data };
         delete info.privateKey;
         let notify = new Notify();
         await notify.sendMessage(job.data.notifyUrl,info);
@@ -431,6 +431,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
         const taskStatus =await getTaskStatus(job.id);
         const { entries: entries } = await RPC.getUtxosByAddresses({ addresses: [P2SHAddress] });
         if (entries.length === 0) {
+            console.error('entries is null');
             flag = false;
         }
         let total = entries.reduce((agg, curr) => {
@@ -438,6 +439,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
         }, 0n);
         let toAddress = P2SHAddress;
         if(taskStatus =='cancel'){
+            console.log('cancel:'+job.id);
             await updateProgress(job,P2SHAddress,amount,'canceled');
             toAddress = address;
             flag = false;
@@ -507,6 +509,7 @@ async function getTaskMintStatus(taskId: string|number) {
     const list = await redis.hgetall("mint_task_status_"+job.id);
     const info = { ...job.data }; // 克隆对象
     delete info.privateKey;
+
     return {list:list,status:status,taskInfo:info};
 }
 
