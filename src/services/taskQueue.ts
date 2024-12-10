@@ -331,17 +331,17 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
         return true;
     }
 
-
     //避免进程启动过程中，重复提交任务
     if(!await redis.get("mint_task_send_"+job.id) ){
         job.data.status = "send";
         await job.update(job.data);
         const transactionId = await wallet.sendV2(AddressList,realGasFee);
+        console.log("send hash"+transactionId);
         if (transactionId) {
             await connection.listenForUtxoChanges(address, transactionId.toString()!).catch((error) => {
                 console.log('---------->main \n',error);
             });
-            await redis.setex("mint_task_send_"+job.id,7*24*60*60,transactionId);
+            await redis.setex("mint_task_send_"+job.id,3*24*60*60,transactionId);
         }
     }
 
