@@ -17,10 +17,17 @@ function formatAmount(amount, dec) {
  * @param {number} dec - 小数位数，例如 8
  * @returns {string} 转换后的字符串金额
  */
-function parseAmount(amount, dec) {
+function parseAmount(amount: string, dec: number): string {
+    // 如果输入为空，则返回 "0"
+    if (!amount) return "0";
+
+    // 补齐小数部分
     const paddedAmount = amount.padStart(dec + 1, "0");
-    const intPart = paddedAmount.slice(0, -dec);
+    const intPart = paddedAmount.slice(0, -dec).replace(/^0+/, "") || "0"; // 移除前导零，至少保留 "0"
     const decPart = paddedAmount.slice(-dec);
+
+    // 如果小数部分全为 "0"，仅返回整数部分，否则返回带小数点的格式
     return decPart === "0".repeat(dec) ? intPart : `${intPart}.${decPart}`;
 }
+
 export { formatAmount, parseAmount };

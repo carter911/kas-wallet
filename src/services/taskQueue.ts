@@ -89,7 +89,7 @@ function sleep(seconds:number) {
 async function updateProgress(job:Job,address,amount,status?:string){
 
     await redis.hset("mint_task_status_"+job.id,address,amount);
-    await redis.expire("mint_task_status_"+job.id, 3600*24*7);
+    await redis.expire("mint_task_status_"+job.id, 3600*24*3);
     const list = await redis.hgetall("mint_task_status_"+job.id);
     const total = Object.values(list).reduce((sum, value) => sum + parseInt(value, 10), 0);
     if(Object.values(list).length!=job.data.walletNumber){
@@ -358,6 +358,7 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
         }
         await RPC.subscribeUtxosChanged([item.address.toString()]);
         try {
+            await updateProgress(job,item.address,item.amount);
             await loopOnP2SHV2(RPC,connection, item.address, item.amount, gasFee.toString(), privateKey, item.script,job,address,index,feeInfo);
             console.log('--------------------------->',index)
         } finally {
