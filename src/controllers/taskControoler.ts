@@ -87,7 +87,7 @@ export async function getStatus(req: Request, res: Response): Promise<void> {
         res.status(400).json({ error: 'taskId is required' });
         return;
     }
-
+    console.log(req.query);
     try {
         const data = await getTaskMintStatus(taskId);
         res.status(200).json(data);

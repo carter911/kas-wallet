@@ -145,9 +145,7 @@ class Wallet {
         let hash: any;
         for (const transaction of transactions) {
             transaction.sign([this.privateKeyObj], false);
-            hash = await transaction.submit(RPC).catch((e:any)=>{
-                console.log(e);
-            });
+            hash = await transaction.submit(RPC);
             console.log(hash);
         }
         return hash;
