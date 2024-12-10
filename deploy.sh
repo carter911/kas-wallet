@@ -37,21 +37,33 @@ fi
 
 echo "使用环境: $ENVIRONMENT"
 
+# 根据环境设置分支名称
+if [ "$ENVIRONMENT" == "production" ]; then
+    BRANCH="main"
+elif [ "$ENVIRONMENT" == "development" ]; then
+    BRANCH="test"
+else
+    echo "未知环境: $ENVIRONMENT，请使用 production 或 development"
+    exit 1
+fi
+
+echo "拉取的 Git 分支: $BRANCH"
+
 # 进入项目目录
 cd "$REPO_DIR" || { echo "目录 $REPO_DIR 不存在"; exit 1; }
 
 # 获取最新代码信息
-git fetch origin main || { echo "Git fetch 失败"; exit 1; }
+git fetch origin "$BRANCH" || { echo "Git fetch 失败"; exit 1; }
 
 # 检查是否有更新
 LOCAL_HASH=$(git rev-parse HEAD)
-REMOTE_HASH=$(git rev-parse origin/main)
+REMOTE_HASH=$(git rev-parse origin/"$BRANCH")
 
 if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
     echo "检测到代码更新，开始拉取并部署..."
 
     git stash || { echo "Git stash 失败"; exit 1; }
-    git pull origin main || { echo "Git 拉取失败"; exit 1; }
+    git pull origin "$BRANCH" || { echo "Git 拉取失败"; exit 1; }
 
     # 复制 Library 文件夹到 dist
     if [ -d "src/Library" ]; then
