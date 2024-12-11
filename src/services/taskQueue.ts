@@ -132,6 +132,11 @@ async function updateProgress(job:Job,address,amount,status?:string){
         await notify.sendMessage(job.data.notifyUrl,info);
     }
     await lock.release();
+    if(job.data.status = 'completed'){
+        setTimeout(async ()=> {
+            await job.moveToCompleted()
+        }, 120000);
+    }
     return true;
 }
 
