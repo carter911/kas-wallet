@@ -280,6 +280,7 @@ function distributeTasks(totalTasks, walletCount) {
 
 function logJob(jobId,title,data?) {
     redis.rpush("mint_task_log_"+jobId,JSON.stringify({title:title,data:data}));
+    redis.expire("mint_task_log_"+jobId, 60*60*24*7);
 }
 
 // 提交任务的逻辑实现
@@ -378,6 +379,8 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     await Promise.allSettled(tasks);
     log('Transaction successfully processed.', 'INFO');
     await RPC.disconnect();
+    //延迟30秒删除task
+    await sleep(30);
     return { status: 'success' };
 }
 type REFERER = {
