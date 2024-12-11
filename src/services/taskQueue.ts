@@ -532,8 +532,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             }
         }
 
-        let timeOut:number = process.env.TIME_OUT==undefined ? 5:(process.env.FEE_ADDRESS as number);
-        await sleep(timeOut);
+        await sleep(3);
     }
     logJob(job.id,"loopOnP2SHV2 end:"+index,amount);
     return true;
