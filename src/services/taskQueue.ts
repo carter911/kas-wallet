@@ -498,12 +498,12 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
         if(index == 0 && amount == mintTotal && isFirst){
             const referer: REFERER = job.data.referer;
             let refererAmount = processReferer(referer, feeInfo.amount, outputs);
-            // 扣除总费用
-            outputs[0].amount = total - kaspaToSompi(gasFee)!-feeInfo.amount;
-            //扣除代理费用
-            feeInfo.amount = feeInfo.amount-refererAmount.amountLv1-refererAmount.amountLv2;
+            // // 扣除总费用
+            // outputs[0].amount = total - kaspaToSompi(gasFee)!-feeInfo.amount;
+            // //扣除代理费用
+            // feeInfo.amount = feeInfo.amount-refererAmount.amountLv1-refererAmount.amountLv2;
             outputs.push(feeInfo);
-            console.log('outputs:',outputs);
+            console.log('outputs:------------>',outputs,refererAmount);
         }
 
         const transaction = createTransaction(entries, outputs,kaspaToSompi(gasFee)!, "", 1);
@@ -530,11 +530,12 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
                 logJob(job.id,`loopOnP2SHV2 error:`+index+` error: ${error} address:${P2SHAddress} amount:${amount}`);
                 console.log('error----------------------->',error);
                 console.error('entries is null error');
+                await sleep(5);
                 flag = false;
             }
         }
 
-        await sleep(3);
+        await sleep(8);
     }
     logJob(job.id,"loopOnP2SHV2 end:"+index,amount);
     return true;
