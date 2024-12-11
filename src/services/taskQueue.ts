@@ -114,7 +114,7 @@ async function updateProgress(job:Job,address,amount,status?:string){
     }
 
     //分布式锁
-    const resource = 'locks:example'+job.id; // 锁的资源标识
+    const resource = 'locks:example'+job.id+job.data.status; // 锁的资源标识
     const ttl = 5000;                 // 锁的过期时间（毫秒）
     const lock = await redlock.acquire([resource], ttl);
     //限制发送频率
