@@ -118,7 +118,7 @@ async function updateProgress(job:Job,address,amount,status?:string){
     }
     if(job.data.current == job.data.total){
         console.log(1111111111111111111);
-        //job.data.status = 'completed';
+        job.data.status = 'completed';
         await job.update(job.data);
     }
 
