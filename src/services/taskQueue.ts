@@ -5,7 +5,7 @@ import {
     kaspaToSompi,
     IPaymentOutput,
     createTransaction,
-    createInputSignature, sompiToKaspaString,
+    createInputSignature,
 } from '../Library/wasm/kaspa';
 import Wallet from "./Wallet";
 import RpcConnection from "./RpcConnection";
