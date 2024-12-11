@@ -69,7 +69,7 @@ export async function submitForm(req: Request, res: Response): Promise<void> {
         };
         const timestamp = Math.floor(Date.now() / 1000);
         const hash = crypto.createHash('sha256').update(JSON.stringify(data)+timestamp).digest('hex');
-        const job = await taskQueue.add(data, { jobId: hash,removeOnComplete: true });
+        const job = await taskQueue.add(data, { jobId: hash});
         await job.progress(0);
         // 返回任务ID以及提交确认
         res.status(200).json({

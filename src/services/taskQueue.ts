@@ -489,10 +489,11 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
 
     // 等待所有任务完成
     await Promise.allSettled(tasks);
+    await sleep(120);
     log('Transaction successfully processed.', 'INFO');
     await RPC.disconnect();
     //延迟30秒删除task
-    await sleep(30);
+
     return { status: 'success' };
 }
 type REFERER = {
@@ -664,6 +665,15 @@ taskQueue.process(50,async (job) => {
     try {
         log(`Starting task with data: ${JSON.stringify(job.data)}`, 'INFO');
         const taskResult = await submitTaskV2(privateKey, ticker, gasFee, amount,walletNumber,job);
+        const delay = 300000; // 延迟 5 秒删除
+        setTimeout(async () => {
+            try {
+                await job.remove();
+                console.log(`Job ${job.id} removed after delay`);
+            } catch (err) {
+                console.error(`Failed to remove job ${job.id}:`, err);
+            }
+        }, delay);
         await job.progress(100);
         return taskResult;
 
@@ -672,7 +682,6 @@ taskQueue.process(50,async (job) => {
         if (error instanceof Error) {
             console.error("Stack trace:", error.stack);
         }
-
         throw error;
     }
 });
