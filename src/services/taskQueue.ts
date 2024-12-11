@@ -138,10 +138,15 @@ async function updateProgress(job:Job,address,amount,status?:string){
 }
 
 async function hincrby(job:Job,increment:number){
-    const key = "job_progress";
-    await redis.hincrby(key,job.id.toString(), increment);
-
-
+    const key = "job_progress"+job.id.toString();
+    await redis.incrby(key, increment);
+    const amount = await redis.get(key);
+    if(amount == job.data.total){
+        let info = { ...job.data };
+        delete info.privateKey;
+        let notify = new Notify();
+        await notify.sendMessage(job.data.notifyUrl,info);
+    }
 }
 
 
