@@ -139,12 +139,6 @@ async function updateProgress(job:Job,address,amount,status?:string){
         let notify = new Notify();
         await notify.sendMessage(job.data.notifyUrl,info);
     }
-
-    if(job.data.status == 'completed'){
-        setTimeout(async ()=> {
-            await job.moveToCompleted()
-        }, 120000);
-    }
     await lock.release();
     return true;
 }
@@ -467,7 +461,13 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
         if (entries.length === 0) {
             console.error('entries is null');
             logJob(job.id,"entries is null"+index,P2SHAddress.toString());
-            flag = false;
+            await sleep(3);
+            errorIndex++;
+            if(errorIndex>10){
+                logJob(job.id,"entries is null error"+index,P2SHAddress.toString());
+                flag = false;
+                break;
+            }
         }
         let total = entries.reduce((agg, curr) => {
             return curr.amount + agg;
@@ -519,13 +519,14 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             }
         }catch (error) {
             errorIndex++;
+            console.log('error----------------------->',error);
             if(errorIndex>8){
                 logJob(job.id,`loopOnP2SHV2 error:`+index+` error: ${error} address:${P2SHAddress} amount:${amount}`);
                 console.log('error----------------------->',error);
                 flag = false;
             }
         }
-        await sleep(2);
+        //await sleep(2);
     }
     logJob(job.id,"loopOnP2SHV2 end:"+index,amount);
     return true;
