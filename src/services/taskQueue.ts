@@ -132,7 +132,7 @@ async function updateProgress(job:Job,address,amount,status?:string){
     let state = await redis.get(key);
     //console.log(job.id,job.data.total,total,job.data.status);
     if(  (job.data.notifyUrl && !state)||force){
-        await redis.setex(key, 5,1);
+        await redis.setex(key, 2,1);
         console.log(job.id,job.data.total,total,job.data.status);
         let info = { ...job.data };
         delete info.privateKey;
