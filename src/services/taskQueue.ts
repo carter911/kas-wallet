@@ -468,6 +468,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             await sleep(5);
             errorIndex++;
             if(errorIndex>30){
+                console.error('entries is null error');
                 logJob(job.id,"entries is null error"+index,P2SHAddress.toString());
                 flag = false;
                 break;
@@ -525,9 +526,10 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
         }catch (error) {
             errorIndex++;
             console.log('error----------------------->',error);
-            if(errorIndex>8){
+            if(errorIndex>30){
                 logJob(job.id,`loopOnP2SHV2 error:`+index+` error: ${error} address:${P2SHAddress} amount:${amount}`);
                 console.log('error----------------------->',error);
+                console.error('entries is null error');
                 flag = false;
             }
         }
