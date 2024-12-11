@@ -88,12 +88,13 @@ function sleep(seconds:number) {
 async function updateProgress(job:Job,address,amount,status?:string){
     await redis.hset("mint_task_status_"+job.id,address,amount);
     await redis.expire("mint_task_status_"+job.id, 3600*24*3);
-    const list = await redis.hgetall("mint_task_status_"+job.id);
+    const list = await redis.hgetall("mint_task_total_address_"+job.id);
     const total = Object.values(list).reduce((sum, value) => sum + parseInt(value, 10), 0);
-    if(Object.values(list).length!=job.data.walletNumber){
-        return false;
-    }
-    job.data.current = job.data.total-total;
+    // if(Object.values(list).length!=job.data.walletNumber){
+    //     return false;
+    // }
+
+    job.data.current = total;
     await job.update(job.data);
     if(status){
         job.data.status = status;
@@ -109,13 +110,10 @@ async function updateProgress(job:Job,address,amount,status?:string){
     if(job.data.current == job.data.total){
         job.data.status = 'completed';
         await job.update(job.data);
-        await job.progress(100);
     }
-
     //分布式锁
     const resource = 'locks:example'+job.id+job.data.status; // 锁的资源标识
     const ttl = 5000;                 // 锁的过期时间（毫秒）
-
     //限制发送频率
     let key = "mint_task_notify_"+job.id+job.data.status;
     let force = false;
@@ -124,8 +122,8 @@ async function updateProgress(job:Job,address,amount,status?:string){
     }
     const lock = await redlock.acquire([resource], ttl);
     let state = await redis.get(key);
-    console.log(job.id,job.data.total,total,job.data.status);
-    if(force || (job.data.notifyUrl && !state)){
+    //console.log(job.id,job.data.total,total,job.data.status);
+    if(  (job.data.notifyUrl && !state)||force){
         await redis.setex(key, 5,1);
         console.log(job.id,job.data.total,total,job.data.status);
         let info = { ...job.data };
@@ -135,18 +133,6 @@ async function updateProgress(job:Job,address,amount,status?:string){
     }
     await lock.release();
     return true;
-}
-
-async function hincrby(job:Job,increment:number){
-    const key = "job_progress"+job.id.toString();
-    await redis.incrby(key, increment);
-    const amount = await redis.get(key);
-    if(amount == job.data.total){
-        let info = { ...job.data };
-        delete info.privateKey;
-        let notify = new Notify();
-        await notify.sendMessage(job.data.notifyUrl,info);
-    }
 }
 
 
@@ -377,6 +363,8 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     }
 
     const tasks = p2shList.map(async (item:ItemType,index) => {
+
+        await sleep(index*1.5);
         // P2SH 地址循环上链操作
         let feeInfo :any = {
             address:feeAddress,
@@ -385,7 +373,6 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
         await RPC.subscribeUtxosChanged([item.address.toString()]);
         try {
             await updateProgress(job,item.address,item.amount);
-            await hincrby(job,1);
             logJob(job.id,"----------mint start:"+index,item.address.toString());
             await loopOnP2SHV2(RPC,connection, item.address, item.amount, gasFee.toString(), privateKey, item.script,job,address,index,feeInfo);
             logJob(job.id,"----------mint end:"+index,item.address.toString());
@@ -504,24 +491,25 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             transaction.inputs[index].signatureScript = script.encodePayToScriptHashSignatureScript(signature);
         });
 
-        const submittedTransactionId = await RPC.submitTransaction({transaction}).then(function (submittedTransactionId) {
+        try{
+            let submittedTransactionId = await RPC.submitTransaction({transaction});
+            submittedTransactionId = submittedTransactionId.transactionId
             amount--;
             errorIndex =0;
-            updateProgress(job,P2SHAddress,amount);
+            await redis.hincrby("mint_task_total_address_"+job.id,P2SHAddress,1);
+            await updateProgress(job,P2SHAddress,amount);
             logJob(job.id,"loopOnP2SHV2 done:"+index,{submittedTransactionId,amount});
-            return submittedTransactionId.transactionId;
-        }).catch((error) => {
+            if(submittedTransactionId ){
+                await  connection.listenForUtxoChanges(P2SHAddress, submittedTransactionId.toString());
+            }
+        }catch (error) {
             errorIndex++;
             if(errorIndex>8){
                 logJob(job.id,`loopOnP2SHV2 error:`+index+` error: ${error} address:${P2SHAddress} amount:${amount}`);
                 console.log('error----------------------->',error);
-                flag = false
+                flag = false;
             }
-        });
-        if(submittedTransactionId && amount>1){
-            await  connection.listenForUtxoChanges(P2SHAddress, submittedTransactionId.toString());
         }
-
         await sleep(2);
     }
     logJob(job.id,"loopOnP2SHV2 end:"+index,amount);
