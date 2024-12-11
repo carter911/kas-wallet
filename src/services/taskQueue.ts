@@ -465,7 +465,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
         if (entries.length === 0) {
             console.error('entries is null');
             logJob(job.id,"entries is null"+index,P2SHAddress.toString());
-            await sleep(3);
+            await sleep(5);
             errorIndex++;
             if(errorIndex>30){
                 logJob(job.id,"entries is null error"+index,P2SHAddress.toString());
