@@ -1,6 +1,6 @@
 import RpcConnectionPool from "./services/RpcConnectionPool";
 import Bull from "bull";
-
+//import MintService from "./services/MintService";
 declare global {
     namespace Express {
         interface Request {
@@ -20,13 +20,7 @@ if(process.env.REDIS_TLS){
     redisOptions.tls = process.env.REDIS_TLS;
 }
 
-let taskQueue: any | null = null;
-try {
-    taskQueue = new Bull('mint-queue', redisOptions);
-    console.log('Task queue initialized successfully');
-} catch (error) {
-    console.error('Error initializing task queue:', error);
-}
+
 
 // Initialize RPC connection pool
 let rpcPool: RpcConnectionPool;
@@ -35,6 +29,19 @@ try {
     console.log('RPC connection pool initialized successfully');
 } catch (error) {
     console.error('Error initializing RPC connection pool:', error);
+}
+
+
+let taskQueue: any | null = null;
+try {
+    taskQueue = new Bull('mint-queue', redisOptions);
+    // taskQueue.process(50,async (job) => {
+    //     const MintTask = new MintService(rpcPool,taskQueue);
+    //     await MintTask.jobRun(job);
+    // });
+    // console.log('Task queue initialized successfully');
+} catch (error) {
+    console.error('Error initializing task queue:', error);
 }
 
 export { rpcPool, taskQueue,redisOptions };

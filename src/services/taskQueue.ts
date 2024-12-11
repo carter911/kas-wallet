@@ -87,7 +87,6 @@ function sleep(seconds:number) {
 
 
 async function updateProgress(job:Job,address,amount,status?:string){
-
     await redis.hset("mint_task_status_"+job.id,address,amount);
     await redis.expire("mint_task_status_"+job.id, 3600*24*3);
     const list = await redis.hgetall("mint_task_status_"+job.id);
@@ -131,7 +130,7 @@ async function updateProgress(job:Job,address,amount,status?:string){
         await notify.sendMessage(job.data.notifyUrl,info);
     }
     await lock.release();
-
+    return true;
 }
 // //找零归集
 // // P2SH 地址循环上链操作
@@ -279,6 +278,10 @@ function distributeTasks(totalTasks, walletCount) {
     return tasks;
 }
 
+function logJob(jobId,title,data?) {
+    redis.rpush("mint_task_log_"+jobId,JSON.stringify({title:title,data:data}));
+}
+
 // 提交任务的逻辑实现
 async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: string, amount: number,walletNumber: number,job:Job) {
     const connection = await rpcPool.getConnection();
@@ -287,8 +290,7 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     const wallet = new Wallet(privateKeyArg.toString(),connection);
     const address = wallet.getAddress();
     const p2shList:any = []; // 存储所有 P2SH 地址
-    log(`main addresses for ticker: ${wallet.getAddress()}`, 'INFO');
-
+    logJob(job.id,"main addresses for ticker",address.toString());
     let amountList = distributeTasks(amount,walletNumber);
     for(var i=0;i<walletNumber;i++){
         const data = wallet.mintOP(ticker,i,address.toString());
@@ -335,21 +337,25 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     if(!await redis.get("mint_task_send_"+job.id) ){
         job.data.status = "send";
         await job.update(job.data);
+        logJob(job.id,"send to p2sh addresses",{AddressList,realGasFee});
         const transactionId = await wallet.sendV2(AddressList,realGasFee);
         console.log("send hash"+transactionId);
         if (transactionId) {
             await connection.listenForUtxoChanges(address, transactionId.toString()!).catch((error) => {
                 console.log('---------->main \n',error);
             });
+            logJob(job.id,"send to p2sh addresses id",transactionId);
             await redis.setex("mint_task_send_"+job.id,3*24*60*60,transactionId);
         }
     }
 
 
     if(job.data.status!="cancel"){
+        logJob(job.id,"update job status mint",job.data);
         job.data.status = "mint";
         await job.update(job.data);
     }
+
     const tasks = p2shList.map(async (item:ItemType,index) => {
         // P2SH 地址循环上链操作
         let feeInfo :any = {
@@ -359,8 +365,9 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
         await RPC.subscribeUtxosChanged([item.address.toString()]);
         try {
             await updateProgress(job,item.address,item.amount);
+            logJob(job.id,"----------mint start:"+index,item.address.toString());
             await loopOnP2SHV2(RPC,connection, item.address, item.amount, gasFee.toString(), privateKey, item.script,job,address,index,feeInfo);
-            console.log('--------------------------->',index)
+            logJob(job.id,"----------mint end:"+index,item.address.toString());
         } finally {
             await RPC.unsubscribeUtxosChanged([item.address.toString()]);
         }
@@ -428,11 +435,13 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
 
     let mintTotal = amount;
     let flag = true;
+    logJob(job.id,"loopOnP2SHV2 start:"+index,P2SHAddress.toString());
     while (amount>0 && flag){
         const taskStatus =await getTaskStatus(job.id);
         const { entries: entries } = await RPC.getUtxosByAddresses({ addresses: [P2SHAddress] });
         if (entries.length === 0) {
             console.error('entries is null');
+            logJob(job.id,"entries is null"+index,P2SHAddress.toString());
             flag = false;
         }
         let total = entries.reduce((agg, curr) => {
@@ -443,6 +452,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             console.log('cancel:'+job.id);
             await updateProgress(job,P2SHAddress,amount,'canceled');
             toAddress = address;
+            logJob(job.id,"cancel:"+index,P2SHAddress.toString());
             flag = false;
         }
         if(amount == 1){
@@ -469,24 +479,29 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
         transaction.inputs.forEach((_,index) => {
             let signature = createInputSignature(transaction, index, privateKey, SighashType.All);
             transaction.inputs[index].signatureScript = script.encodePayToScriptHashSignatureScript(signature);
-        })
+        });
+
         const submittedTransactionId = await RPC.submitTransaction({transaction}).then(function (submittedTransactionId) {
             amount--;
             errorIndex =0;
             updateProgress(job,P2SHAddress,amount);
+            logJob(job.id,"loopOnP2SHV2 done:"+index,{submittedTransactionId,amount});
             return submittedTransactionId.transactionId;
         }).catch((error) => {
             errorIndex++;
             if(errorIndex>8){
+                logJob(job.id,`loopOnP2SHV2 error:`+index+` error: ${error} address:${P2SHAddress} amount:${amount}`);
                 console.log('error----------------------->',error);
                 flag = false
             }
         });
-        if(submittedTransactionId){
+        if(submittedTransactionId && amount>1){
             await  connection.listenForUtxoChanges(P2SHAddress, submittedTransactionId.toString());
         }
+
         await sleep(2);
     }
+    logJob(job.id,"loopOnP2SHV2 end:"+index,amount);
     return true;
 }
 
@@ -527,7 +542,7 @@ async function cancelTask(taskId: string) {
     return 'Job not found';
 }
 
-// 任务处理器 单独任务及出
+// // 任务处理器 单独任务及出
 taskQueue.process(50,async (job) => {
     console.log("taskQueue processing \n");
     const { privateKey, ticker, gasFee, amount,walletNumber} = job.data;

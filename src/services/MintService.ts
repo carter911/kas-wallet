@@ -121,14 +121,13 @@ class MintTask {
         console.log("taskQueue processing \n",job.data);
         const { privateKey, ticker, gasFee, amount,walletNumber} = job.data;
         try {
-
+            this.logJob(job.id, `Processing job with ${walletNumber} wallets`);
             const connection = await this.rpcPool.getConnection();
             const RPC = await connection.getRpcClient();
             const wallet = new Wallet(privateKey.toString(),connection);
             const address = wallet.getAddress();
             const p2shList:any = []; // 存储所有 P2SH 地址
             this.log(`main addresses for ticker: ${wallet.getAddress()}`, 'INFO');
-
             //生成p2sh地址
             let amountList = this.distributeTasks(amount,walletNumber);
             for(var i=0;i<walletNumber;i++){
@@ -146,7 +145,7 @@ class MintTask {
             //给每个地址分配对应的金额
             let AddressList:any = [];
             p2shList.forEach((item:ItemType,index) => {
-                let amt = amountList[index]*parseFloat(gasFee)+1;
+                let amt = amountList[index]*parseFloat(gasFee)+0.22;
                 if(index ==0){
                     //第一个地址扣费用
                     amt = amt+feeAmount;
@@ -158,6 +157,8 @@ class MintTask {
                 p2shList[index].amount = amountList[index];
             });
 
+            // console.log("AddressList",AddressList);
+            // return true;
 
             //设置gas费用
             let realGasFee:number = AddressList.length*1;
@@ -166,8 +167,6 @@ class MintTask {
             }else if(walletNumber>5){
                 realGasFee = AddressList.length*1;
             }
-
-
             //还没开始 就取消了 责立即取消所有的钱包充值
             if(job.data.status =='cancel'){
                 job.data.status = 'canceled';
@@ -181,13 +180,15 @@ class MintTask {
                 job.data.status = "send";
                 await job.update(job.data);
                 await RPC.subscribeUtxosChanged([address.toString()]);
+                this.logJob(job.id, `Sending ${AddressList.length} transactions`,AddressList)
                 const transactionId = await wallet.sendV2(AddressList,realGasFee);
-                console.log("send hash"+transactionId);
+
                 if (transactionId) {
                     await connection.listenForUtxoChanges(address, transactionId.toString()!).catch((error) => {
                         console.log('---------->main \n',error);
                     });
                     await redis.setex("mint_task_send_"+job.id,3*24*60*60,transactionId);
+                    this.logJob(job.id, `Send Success ${AddressList.length} transactions`,AddressList)
                 }
                 //防止p2sh没有接收到资金
                 await this.sleep(2);
@@ -203,6 +204,8 @@ class MintTask {
             await RPC.subscribeUtxosChanged(p_address);
 
             const tasks = p2shList.map(async (item:ItemType,index) => {
+
+                this.logJob(job.id, `Processing job with ${index} ${item.address} ${item.amount}`)
                 // P2SH 地址循环上链操作
                 let feeInfo :any;
                 if(this.feeAddress && this.feeRate>0){
@@ -215,15 +218,20 @@ class MintTask {
                     await this.updateProgress(job,item.address,item.amount);
                     await this.loopOnP2SHV2(RPC,connection, item.address, item.amount, gasFee.toString(), privateKey, item.script,job,address,index,feeInfo);
                     await RPC.unsubscribeUtxosChanged([item.address]);
-                    console.log('--------------------------->',index)
+                    console.log('done --------------------------->',index)
                 }catch (e) {
+                    this.logJob(job.id, `job errror ${e}`);
                     console.log('loop error----------->',e);
                 }
             });
+
+            this.logJob(job.id, `job done`)
+            console.log("job is done:"+job.id)
             // 等待所有任务完成
             await Promise.allSettled(tasks);
             await RPC.unsubscribeUtxosChanged(p_address);
             this.log('Transaction successfully processed.', 'INFO');
+            this.logJob(job.id, `job successfully processed.`)
             await RPC.disconnect();
             return "done";
         } catch (error) {
@@ -231,6 +239,7 @@ class MintTask {
             if (error instanceof Error) {
                 console.error("Stack trace:", error.stack);
             }
+            this.logJob(job.id, `job error ${error}`)
             throw error;
         }
     }
@@ -272,7 +281,7 @@ class MintTask {
             amount = parseInt(cacheNum);
         }
 
-
+        this.logJob(job.id, `Processing job with ${index} ${P2SHAddress} ${amount}`)
         let mintTotal = amount;
         let flag = true;
         console.log('----------------->',P2SHAddress,amount);
@@ -297,15 +306,19 @@ class MintTask {
                 toAddress = address;
                 flag = false;
             }
-            if(amount == 1){
-                toAddress = address;
-            }
+
             let outputs: IPaymentOutput[] = [
                 {
                     address: toAddress,//找零地址
                     amount: total - kaspaToSompi(gasFee)!
                 }
             ];
+            if(amount == 1){
+                toAddress = address;
+                outputs[0].amount = kaspaToSompi("0.22")!;
+                outputs[0].address = toAddress;
+
+            }
             //第一个钱包 并且是第一次mint
             if(index == 0 && amount == mintTotal && isFirst){
                 // 扣除总费用
@@ -316,36 +329,41 @@ class MintTask {
                 if(referer.lv1_address && referer.lv1_rate){
                     lv1Outputs = this.processReferer(feeInfo.amount, referer.lv1_rate, referer.lv1_address);
                     outputs.push(lv1Outputs);
-                    feeInfo.amount = feeInfo.amount-lv1Outputs.amount;
+                    if(lv1Outputs && lv1Outputs.amount){
+                        feeInfo.amount = feeInfo.amount-lv1Outputs.amount;
+                    }
+
                 }
                 if(referer.lv2_address && referer.lv2_rate){
                     lv2Outputs = this.processReferer(feeInfo.amount, referer.lv2_rate, referer.lv2_address);
                     outputs.push(lv2Outputs);
-                    feeInfo.amount = feeInfo.amount-lv2Outputs.amount;
+                    if(lv2Outputs && lv2Outputs.amount){
+                        feeInfo.amount = feeInfo.amount-lv2Outputs.amount;
+                    }
                 }
                 //扣除代理费用
                 outputs.push(feeInfo);
                 console.log(feeInfo,outputs);
             }
-
             const transaction = createTransaction(entries, outputs,kaspaToSompi(gasFee)!, "", 1);
             transaction.inputs.forEach((_,index) => {
                 let privateKeyObj = new PrivateKey(privateKey);
                 let signature = createInputSignature(transaction, index, privateKeyObj, SighashType.All);
                 transaction.inputs[index].signatureScript = script.encodePayToScriptHashSignatureScript(signature);
             })
-
+            this.logJob(job.id, `createTransaction submit`,{P2SHAddress,amount})
             let submittedTransactionId;
             try {
                 submittedTransactionId = await RPC.submitTransaction({ transaction });
                 amount--;
                 errorIndex = 0;
-                //submittedTransactionId = submittedTransactionId.transactionId; // 提取 transactionId
                 await  connection.listenForUtxoChanges(P2SHAddress, submittedTransactionId.transactionId.toString());
+                this.logJob(job.id, `createTransaction success`,{submittedTransactionId,P2SHAddress,amount})
                 await this.updateProgress(job, P2SHAddress, amount);
             } catch (error) {
                 errorIndex++;
                 if (errorIndex > 8) {
+                    this.logJob(job.id, `createTransaction error${error}`)
                     console.log('Error----------------------->', error);
                     flag = false;
                 }
@@ -353,7 +371,6 @@ class MintTask {
             }
             await this.sleep(2);
         }
-        console.log('done----------------------->');
         return true;
     }
     async getTaskStatus(taskId: string|number) {
@@ -363,6 +380,10 @@ class MintTask {
         }
         const {status} = job.data;
         return status;
+    }
+
+    logJob(jobId,title,data?) {
+        redis.rpush("mint_task_log_"+jobId,JSON.stringify({title:title,data:data}));
     }
 }
 
