@@ -116,15 +116,17 @@ async function updateProgress(job:Job,address,amount,status?:string){
         }
         await job.update(job.data);
     }
+    let force = false;
     if(job.data.current == job.data.total){
         console.log(1111111111111111111);
         job.data.status = 'completed';
         await job.update(job.data);
+        force = true;
     }
 
     //限制发送频率
     let key = "mint_task_notify_"+job.id+job.data.status;
-    let force = false;
+
     if(job.data.status !=currentStatus){
         force = true
     }
@@ -444,13 +446,12 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
     let errorIndex=0;
     let cacheNum:string|null = await redis.hget("mint_task_status_"+job.id,P2SHAddress);
     let amount:number = amountNum;
-
     let isFirst:boolean = true;
     //说明不是第一次进来
     if(cacheNum!=null && parseInt(cacheNum) != amountNum){
         isFirst = false
     }
-
+    console.log(connection.connect());
     if(cacheNum !== null){
         amount = parseInt(cacheNum);
     }
@@ -466,7 +467,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             logJob(job.id,"entries is null"+index,P2SHAddress.toString());
             await sleep(3);
             errorIndex++;
-            if(errorIndex>10){
+            if(errorIndex>30){
                 logJob(job.id,"entries is null error"+index,P2SHAddress.toString());
                 flag = false;
                 break;
@@ -518,9 +519,9 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             await redis.hincrby("mint_task_total_address_"+job.id,P2SHAddress,1);
             await updateProgress(job,P2SHAddress,amount);
             logJob(job.id,"loopOnP2SHV2 done:"+index,{submittedTransactionId,amount});
-            if(submittedTransactionId ){
-                await  connection.listenForUtxoChanges(P2SHAddress, submittedTransactionId.toString());
-            }
+            // if(submittedTransactionId ){
+            //     await  connection.listenForUtxoChanges(P2SHAddress, submittedTransactionId.toString());
+            // }
         }catch (error) {
             errorIndex++;
             console.log('error----------------------->',error);
@@ -530,6 +531,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
                 flag = false;
             }
         }
+        await sleep(process.env.TIME_OUT || 5);
     }
     logJob(job.id,"loopOnP2SHV2 end:"+index,amount);
     return true;
