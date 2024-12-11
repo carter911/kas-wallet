@@ -379,7 +379,7 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
         // P2SH 地址循环上链操作
         let feeInfo :any = {
             address:feeAddress,
-            amount:kaspaToSompi(feeAmount.toString())!
+            amount:kaspaToSompi("1")!
         }
         await RPC.subscribeUtxosChanged([item.address.toString()]);
         try {
@@ -499,7 +499,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             //const referer: REFERER = job.data.referer;
             //let refererAmount = processReferer(referer, feeInfo.amount, outputs);
             // // 扣除总费用
-            // outputs[0].amount = total - kaspaToSompi(gasFee)!-feeInfo.amount;
+            outputs[0].amount = total - kaspaToSompi(gasFee)!-feeInfo.amount;
             // //扣除代理费用
             // feeInfo.amount = feeInfo.amount-refererAmount.amountLv1-refererAmount.amountLv2;
             outputs.push(feeInfo);
