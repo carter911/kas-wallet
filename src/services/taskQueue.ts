@@ -385,6 +385,9 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
             logJob(job.id,"----------mint start:"+index,item.address.toString());
             await loopOnP2SHV2(RPC,connection, item.address, item.amount, gasFee.toString(), privateKey, item.script,job,address,index,feeInfo);
             logJob(job.id,"----------mint end:"+index,item.address.toString());
+        }catch(e){
+            console.log("error",e);
+            logJob(job.id,"----------mint error:"+index,e);
         } finally {
             await RPC.unsubscribeUtxosChanged([item.address.toString()]);
         }
@@ -498,6 +501,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             //扣除代理费用
             feeInfo.amount = feeInfo.amount-refererAmount.amountLv1-refererAmount.amountLv2;
             outputs.push(feeInfo);
+            console.log('outputs:',outputs);
         }
 
         const transaction = createTransaction(entries, outputs,kaspaToSompi(gasFee)!, "", 1);
@@ -526,7 +530,6 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
                 flag = false;
             }
         }
-        //await sleep(2);
     }
     logJob(job.id,"loopOnP2SHV2 end:"+index,amount);
     return true;
