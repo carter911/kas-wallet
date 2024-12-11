@@ -86,20 +86,29 @@ function sleep(seconds:number) {
 
 
 async function updateProgress(job:Job,address,amount,status?:string){
+
+    //分布式锁
+    const resource = 'locks:example'+job.id+job.data.status; // 锁的资源标识
+    const ttl = 5000;                 // 锁的过期时间（毫秒）
+    const lock = await redlock.acquire([resource], ttl);
+
     await redis.hset("mint_task_status_"+job.id,address,amount);
     await redis.expire("mint_task_status_"+job.id, 3600*24*3);
+
     const list = await redis.hgetall("mint_task_total_address_"+job.id);
     const total = Object.values(list).reduce((sum, value) => sum + parseInt(value, 10), 0);
+
+    let currentStatus = job.data.status;
+    job.data.current = total;
+    console.log(job.data.current,job.data.total,total,job.data.status);
     // if(Object.values(list).length!=job.data.walletNumber){
     //     return false;
     // }
 
-    job.data.current = total;
     await job.update(job.data);
     if(status){
         job.data.status = status;
         job.data.cancelnum = +1;
-
         if(job.data.cancelnum == job.data.walletNumber){
             job.data.status = 'canceled';
             await job.update(job.data);
@@ -108,19 +117,18 @@ async function updateProgress(job:Job,address,amount,status?:string){
         await job.update(job.data);
     }
     if(job.data.current == job.data.total){
-        job.data.status = 'completed';
+        console.log(1111111111111111111);
+        //job.data.status = 'completed';
         await job.update(job.data);
     }
-    //分布式锁
-    const resource = 'locks:example'+job.id+job.data.status; // 锁的资源标识
-    const ttl = 5000;                 // 锁的过期时间（毫秒）
+
     //限制发送频率
     let key = "mint_task_notify_"+job.id+job.data.status;
     let force = false;
-    if(job.data.status == 'completed'){
+    if(job.data.status !=currentStatus){
         force = true
     }
-    const lock = await redlock.acquire([resource], ttl);
+
     let state = await redis.get(key);
     //console.log(job.id,job.data.total,total,job.data.status);
     if(  (job.data.notifyUrl && !state)||force){
@@ -131,12 +139,13 @@ async function updateProgress(job:Job,address,amount,status?:string){
         let notify = new Notify();
         await notify.sendMessage(job.data.notifyUrl,info);
     }
-    await lock.release();
-    if(job.data.status = 'completed'){
+
+    if(job.data.status == 'completed'){
         setTimeout(async ()=> {
             await job.moveToCompleted()
         }, 120000);
     }
+    await lock.release();
     return true;
 }
 
@@ -307,6 +316,7 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
         const data = wallet.mintOP(ticker,i,address.toString());
         const p2shInfo = wallet.makeP2shAddress(privateKeyArg.toString(),data);
         p2shList.push(p2shInfo);
+
     }
 
     let feeAmount = amount*feeRate;
@@ -327,9 +337,9 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
             amount:amt
         });
         p2shList[index].amount = amountList[index];
+        redis.hset("mint_task_status_"+job.id,item.address,amountList[index]);
     });
     await RPC.subscribeUtxosChanged([address.toString()]);
-
     let realGasFee:number = AddressList.length*1;
     if(walletNumber==1){
         realGasFee = 0.0004;
@@ -377,7 +387,7 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
         }
         await RPC.subscribeUtxosChanged([item.address.toString()]);
         try {
-            await updateProgress(job,item.address,item.amount);
+            //await updateProgress(job,item.address,item.amount);
             logJob(job.id,"----------mint start:"+index,item.address.toString());
             await loopOnP2SHV2(RPC,connection, item.address, item.amount, gasFee.toString(), privateKey, item.script,job,address,index,feeInfo);
             logJob(job.id,"----------mint end:"+index,item.address.toString());
