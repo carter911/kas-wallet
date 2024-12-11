@@ -404,43 +404,43 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     await sleep(30);
     return { status: 'success' };
 }
-type REFERER = {
-    lv1_address: string;
-    lv1_rate: number;
-    lv2_address: string;
-    lv2_rate: number;
-};
-function processReferer(
-    referer: REFERER,
-    feeAmount: number,
-    outputs:IPaymentOutput[],
-    threshold = 0.22
-) {
-    const processLevel = (
-        address: string | undefined,
-        rate: number | undefined
-    ) => {
-        let amount:bigint = 0n;
-        if (address && typeof address === "string" && rate && typeof rate === "number") {
-            const amountInKaspa = parseFloat(sompiToKaspaString(feeAmount)) * rate;
-            if (amountInKaspa >= threshold) {
-                const amountInSompi = kaspaToSompi(amountInKaspa.toString());
-                if (amountInSompi !== undefined) {
-                    amount = amountInSompi;
-                    outputs.push({
-                        address,
-                        amount: amountInSompi,
-                    });
-                }
-            }
-        }
-        return amount;
-    };
-
-    let amountLv1:bigint = processLevel(referer.lv1_address, referer.lv1_rate);
-    let amountLv2:bigint = processLevel(referer.lv2_address, referer.lv2_rate);
-    return {amountLv1,amountLv2}
-}
+// type REFERER = {
+//     lv1_address: string;
+//     lv1_rate: number;
+//     lv2_address: string;
+//     lv2_rate: number;
+// };
+// function processReferer(
+//     referer: REFERER,
+//     feeAmount: number,
+//     outputs:IPaymentOutput[],
+//     threshold = 0.22
+// ) {
+//     const processLevel = (
+//         address: string | undefined,
+//         rate: number | undefined
+//     ) => {
+//         let amount:bigint = 0n;
+//         if (address && typeof address === "string" && rate && typeof rate === "number") {
+//             const amountInKaspa = parseFloat(sompiToKaspaString(feeAmount)) * rate;
+//             if (amountInKaspa >= threshold) {
+//                 const amountInSompi = kaspaToSompi(amountInKaspa.toString());
+//                 if (amountInSompi !== undefined) {
+//                     amount = amountInSompi;
+//                     outputs.push({
+//                         address,
+//                         amount: amountInSompi,
+//                     });
+//                 }
+//             }
+//         }
+//         return amount;
+//     };
+//
+//     let amountLv1:bigint = processLevel(referer.lv1_address, referer.lv1_rate);
+//     let amountLv2:bigint = processLevel(referer.lv2_address, referer.lv2_rate);
+//     return {amountLv1,amountLv2}
+// }
 
 async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, amountNum: number, gasFee: string, privateKey: PrivateKey,script:ScriptBuilder,job:Job,address,index:number,feeInfo:any) {
     let errorIndex=0;
@@ -496,14 +496,14 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
         ];
         //第一个钱包 并且是第一次mint
         if(index == 0 && amount == mintTotal && isFirst){
-            const referer: REFERER = job.data.referer;
-            let refererAmount = processReferer(referer, feeInfo.amount, outputs);
+            //const referer: REFERER = job.data.referer;
+            //let refererAmount = processReferer(referer, feeInfo.amount, outputs);
             // // 扣除总费用
             // outputs[0].amount = total - kaspaToSompi(gasFee)!-feeInfo.amount;
             // //扣除代理费用
             // feeInfo.amount = feeInfo.amount-refererAmount.amountLv1-refererAmount.amountLv2;
             outputs.push(feeInfo);
-            console.log('outputs:------------>',outputs,refererAmount);
+            //console.log('outputs:------------>',outputs,refererAmount);
         }
 
         const transaction = createTransaction(entries, outputs,kaspaToSompi(gasFee)!, "", 1);
