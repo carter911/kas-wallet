@@ -85,53 +85,164 @@ function sleep(seconds:number) {
 // }
 
 
+async function updateProgress(job: Job, address, amount, status?: string) {
+    const redisKey = `mint_task_status_${job.id}`;
+    const notifyKey = `mint_task_notify_${job.id}_${status}`;
+    const lockKey = `locks:example_${job.id}_${status}`;
+    const notifyTTL = 5; // 限制推送频率 5 秒
+    const expireTime = 3600 * 24 * 3; // Redis 键过期时间 3 天
 
-async function updateProgress(job:Job,address,amount,status?:string){
-    await redis.hset("mint_task_status_"+job.id,address,amount);
-    await redis.expire("mint_task_status_"+job.id, 3600*24*3);
-    const list = await redis.hgetall("mint_task_status_"+job.id);
+    // 更新进度到 Redis
+    await redis.pipeline()
+        .hset(redisKey, address, amount)
+        .expire(redisKey, expireTime)
+        .exec();
+
+    const list = await redis.hgetall(redisKey);
     const total = Object.values(list).reduce((sum, value) => sum + parseInt(value, 10), 0);
-    if(Object.values(list).length!=job.data.walletNumber){
+    const walletCount = Object.values(list).length;
+
+    // 任务未完成，直接返回
+    if (walletCount !== job.data.walletNumber) {
         return false;
     }
-    job.data.current = job.data.total-total;
-    await job.update(job.data);
-    if(status){
-        job.data.status = status;
-        job.data.cancelnum = +1;
 
-        if(job.data.cancelnum == job.data.walletNumber){
-            job.data.status = 'canceled';
-            await job.update(job.data);
-            await job.progress(100);
+    // 更新任务当前状态
+    const jobData = { ...job.data };
+    jobData.current = jobData.total - total;
+
+
+
+    if (status) {
+        jobData.status = status;
+        jobData.cancelnum = (jobData.cancelnum || 0) + 1;
+
+        // 所有任务取消，标记为 `canceled`
+        if (jobData.cancelnum === jobData.walletNumber) {
+            jobData.status = 'canceled';
+            jobData.progress = 100;
+            await job.update(jobData);
+            await forceNotify(jobData, job); // 强制推送消息
+            return true;
         }
-        await job.update(job.data);
-    }
-    if(job.data.current == job.data.total){
-        job.data.status = 'completed';
-        await job.update(job.data);
-        await job.progress(100);
     }
 
-    //分布式锁
-    const resource = 'locks:example'+job.id+job.data.status; // 锁的资源标识
-    const ttl = 5000;                 // 锁的过期时间（毫秒）
-    const lock = await redlock.acquire([resource], ttl);
-    //限制发送频率
-    let key = "mint_task_notify_"+job.id+job.data.status;
-    let state = await redis.get(key);
-    console.log(job.id,job.data.total,total,job.data.status);
-    if(job.data.notifyUrl && !state){
-        await redis.setex(key, 5,1);
-        console.log(job.id,job.data.total,total,job.data.status);
-        let info = { ...job.data };
-        delete info.privateKey;
-        let notify = new Notify();
-        await notify.sendMessage(job.data.notifyUrl,info);
+    // 所有任务完成，标记为 `completed`
+    if (jobData.current === jobData.total) {
+        jobData.status = 'completed';
+        jobData.progress = 100;
+        await job.update(jobData);
+        await forceNotify(jobData, job); // 强制推送消息
+        return true;
     }
-    await lock.release();
+
+    // 分布式锁
+    const ttl = 5000; // 锁的过期时间
+    let lock;
+    try {
+        lock = await redlock.acquire([lockKey], ttl);
+
+        // 限制通知推送频率
+        const notifyState = await redis.get(notifyKey);
+        if (jobData.notifyUrl && !notifyState) {
+            await redis.setex(notifyKey, notifyTTL, 1); // 设置限流状态
+            await notifyClient(jobData, job); // 推送消息
+        }
+    } catch (err) {
+        console.error(`Failed to acquire lock for job ${job.id}:`, err);
+    } finally {
+        if (lock) {
+            await lock.release();
+        }
+    }
+
+    // 最终更新任务数据
+    await job.update(jobData);
     return true;
 }
+
+// 强制推送消息（跳过限流逻辑）
+async function forceNotify(jobData, job) {
+    const info = { ...jobData };
+    delete info.privateKey; // 确保敏感信息不会被推送
+    const notify = new Notify();
+    try {
+        await notify.sendMessage(jobData.notifyUrl, info);
+        console.log(`Force notify sent for job ${job.id} with status ${jobData.status}`);
+    } catch (error) {
+        console.error(`Force notify failed for job ${job.id}:`, error);
+    }
+}
+
+// 正常推送消息（包含限流逻辑）
+async function notifyClient(jobData, job) {
+    const info = { ...jobData };
+    delete info.privateKey; // 确保敏感信息不会被推送
+    const notify = new Notify();
+    try {
+        await notify.sendMessage(jobData.notifyUrl, info);
+        console.log(`Notify sent for job ${job.id} with status ${jobData.status}`);
+    } catch (error) {
+        console.error(`Notify failed for job ${job.id}:`, error);
+    }
+}
+
+// async function updateProgress(job:Job,address,amount,status?:string){
+//     await redis.hset("mint_task_status_"+job.id,address,amount);
+//     await redis.expire("mint_task_status_"+job.id, 3600*24*3);
+//     const list = await redis.hgetall("mint_task_status_"+job.id);
+//     const total = Object.values(list).reduce((sum, value) => sum + parseInt(value, 10), 0);
+//     if(Object.values(list).length!=job.data.walletNumber){
+//         return false;
+//     }
+//     job.data.current = job.data.total-total;
+//     await job.update(job.data);
+//     if(status){
+//         job.data.status = status;
+//         job.data.cancelnum = +1;
+//
+//         if(job.data.cancelnum == job.data.walletNumber){
+//             job.data.status = 'canceled';
+//             await job.update(job.data);
+//             await job.progress(100);
+//         }
+//         await job.update(job.data);
+//     }
+//     if(job.data.current == job.data.total){
+//         job.data.status = 'completed';
+//         await job.update(job.data);
+//         await job.progress(100);
+//     }
+//
+//     //分布式锁
+//     const resource = 'locks:example'+job.id+job.data.status; // 锁的资源标识
+//     const ttl = 5000;                 // 锁的过期时间（毫秒）
+//     const lock = await redlock.acquire([resource], ttl);
+//     //限制发送频率
+//     let key = "mint_task_notify_"+job.id+job.data.status;
+//     let state = await redis.get(key);
+//     console.log(job.id,job.data.total,total,job.data.status);
+//     if(job.data.notifyUrl && !state){
+//         await redis.setex(key, 5,1);
+//         console.log(job.id,job.data.total,total,job.data.status);
+//         let info = { ...job.data };
+//         delete info.privateKey;
+//         let notify = new Notify();
+//         await notify.sendMessage(job.data.notifyUrl,info);
+//     }
+//     await lock.release();
+//     return true;
+// }
+
+async function hincrby(job:Job,increment:number){
+    const key = "job_progress";
+    await redis.hincrby(key,job.id.toString(), increment);
+
+
+}
+
+
+
 // //找零归集
 // // P2SH 地址循环上链操作
 // async function loopOnP2SH(connection: RpcConnection, P2SHAddress: string, amount: number, gasFee: string, privateKey: PrivateKey,script:ScriptBuilder,job:Job,address) {
@@ -366,6 +477,7 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
         await RPC.subscribeUtxosChanged([item.address.toString()]);
         try {
             await updateProgress(job,item.address,item.amount);
+            await hincrby(job,1);
             logJob(job.id,"----------mint start:"+index,item.address.toString());
             await loopOnP2SHV2(RPC,connection, item.address, item.amount, gasFee.toString(), privateKey, item.script,job,address,index,feeInfo);
             logJob(job.id,"----------mint end:"+index,item.address.toString());
