@@ -12,7 +12,6 @@ import {
     addressFromScriptPublicKey, Transaction
 } from '../Library/wasm/kaspa';
 import RpcConnection from './RpcConnection';
-import {publickey_toAddress, publickey_toString} from "../Library/wasm/kaspa/kaspa_bg.wasm";
 type ItemType = {
     address:string,
     script: ScriptBuilder;
