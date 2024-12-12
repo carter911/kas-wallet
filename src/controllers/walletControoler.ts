@@ -239,11 +239,19 @@ export async function sell(req: Request, res: Response): Promise<void> {
         res.status(401).json({ error: 'ticker is undefined, using default network.' });
     }
 
+
+
     try {
         const connection = await req.pool.getConnection();
         const wallet = new Wallet(privateKey.toString(),connection);
         const sendAmount = tickAmount*100000000;
         const sendAddress = wallet.getAddress();
+
+        await new Krc().getTickList(sendAddress).then((info)=>{
+            if(info.balance<tickAmount){
+                throw new Error("Insufficient balance");
+            }
+        });
         await new Krc().getTickList(sendAddress).then((info)=>{
             if(info.balance<sendAmount){
                 throw new Error("Insufficient balance");

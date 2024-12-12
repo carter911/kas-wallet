@@ -428,7 +428,6 @@ class Wallet {
             amount: kaspaToSompi(amount.toString())!,
         }];
         const tx:Transaction = createTransaction([entry], output, 0n, "", 1);
-        console.log(tx.outputs);
         let signature = createInputSignature(tx, 0, privateKey, SighashType.SingleAnyOneCanPay);
         tx.inputs[0].signatureScript = script.encodePayToScriptHashSignatureScript(signature)
         return tx.serializeToSafeJSON();
@@ -463,7 +462,7 @@ class Wallet {
 
             let entry:any = {
                 "address": tx.inputs[0].utxo.address.toString(),
-                "amount": kaspaToSompi(tx.inputs[0].utxo.amount.toString())!,
+                "amount": BigInt(tx.inputs[0].utxo.amount.toString())!,
                 "outpoint": {
                     "transactionId": tx.inputs[0].utxo.outpoint.transactionId,
                     "index": 0
@@ -487,7 +486,7 @@ class Wallet {
                 amount: Sompiamount!
             }];
 
-            console.log(total-tx.outputs[0].value!);
+            console.log('-------->',total-BigInt(tx.outputs[0].value)!);
             outputs.push({
                 address: address.toString(),
                 amount: total-Sompiamount!
@@ -502,6 +501,8 @@ class Wallet {
                 priorityFee: 1n,
                 networkId: this.network
             });
+
+            console.log(111111);
             for (const transaction of transactions) {
 
                 transaction.fillInput(0, tx.inputs[0].signatureScript);
@@ -511,7 +512,7 @@ class Wallet {
 
             return summary.finalTransactionId
         } catch (error) {
-            console.log(error);
+            console.log('----------error',error);
             return error
         }
     }
