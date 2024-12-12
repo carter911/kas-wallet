@@ -460,6 +460,10 @@ class Wallet {
             }
 
 
+            let publicKey = tx.inputs[0].utxo.scriptPublicKey.script;
+            if(this.network != "mainnet"){
+                 publicKey = "0000" +tx.inputs[0].utxo.scriptPublicKey.script;
+            }
             let entry:any = {
                 "address": tx.inputs[0].utxo.address.toString(),
                 "amount": BigInt(tx.inputs[0].utxo.amount.toString())!,
@@ -467,7 +471,7 @@ class Wallet {
                     "transactionId": tx.inputs[0].utxo.outpoint.transactionId,
                     "index": 0
                 },
-                "scriptPublicKey": "0000" + tx.inputs[0].utxo.scriptPublicKey.script,
+                "scriptPublicKey": publicKey,
                 "blockDaaScore": tx.inputs[0].utxo.blockDaaScore,
                 "isCoinbase": false
             }
