@@ -429,8 +429,9 @@ class Wallet {
         }];
         const tx:Transaction = createTransaction([entry], output, 0n, "", 1);
         let signature = createInputSignature(tx, 0, privateKey, SighashType.SingleAnyOneCanPay);
-        tx.inputs[0].signatureScript = script.encodePayToScriptHashSignatureScript(signature)
-        return tx.serializeToSafeJSON();
+        tx.inputs[0].signatureScript = script.encodePayToScriptHashSignatureScript(signature);
+        let txJson=  {tx:tx.serializeToSafeJSON(),address:address.toString()};
+        return JSON.stringify(txJson);
     }
 
 
@@ -441,7 +442,9 @@ class Wallet {
         const RPC = await this.RpcConnection.getRpcClient();
         try {
             //sell tx
-            let tx:Transaction = Transaction.deserializeFromSafeJSON(data);
+            let JSONData = JSON.parse(data);
+            let tx:Transaction = Transaction.deserializeFromSafeJSON(JSONData.tx);
+            let sellAddress = JSONData.address;
             console.log(tx.inputs[0].utxo);
             const {entries} = await RPC.getUtxosByAddresses({addresses: [address.toString()]});
             let total:bigint = entries.reduce((agg, curr) => {
@@ -460,11 +463,6 @@ class Wallet {
             }
 
 
-            let publicKey = "0000"+tx.inputs[0].utxo.scriptPublicKey.script;
-            if(this.network != "mainnet"){
-                 publicKey = "0000" +tx.inputs[0].utxo.scriptPublicKey.script;
-            }
-
             let entry:any = {
                 "address": tx.inputs[0].utxo.address.toString(),
                 "amount": BigInt(tx.inputs[0].utxo.amount.toString())!,
@@ -472,7 +470,7 @@ class Wallet {
                     "transactionId": tx.inputs[0].utxo.outpoint.transactionId,
                     "index": 0
                 },
-                "scriptPublicKey": publicKey,
+                "scriptPublicKey": "0000" + tx.inputs[0].utxo.scriptPublicKey.script,
                 "blockDaaScore": tx.inputs[0].utxo.blockDaaScore,
                 "isCoinbase": false
             }
@@ -487,7 +485,6 @@ class Wallet {
             }
             let Sompiamount =  BigInt(tx.outputs[0].value);
 
-            let sellAddress = tx.inputs[0].utxo.address;
             let outputs:IPaymentOutput[] = [{
                 address: sellAddress.toString(),
                 amount: Sompiamount!
@@ -508,8 +505,6 @@ class Wallet {
                 priorityFee: 1n,
                 networkId: this.network
             });
-
-            console.log(111111);
             for (const transaction of transactions) {
 
                 transaction.fillInput(0, tx.inputs[0].signatureScript);
@@ -519,7 +514,7 @@ class Wallet {
 
             return summary.finalTransactionId
         } catch (error) {
-            console.log('----------error',error);
+            console.log(error);
             return error
         }
     }
