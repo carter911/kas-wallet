@@ -535,7 +535,7 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
             }
         }
 
-        await sleep(8);
+        await sleep(3);
     }
     logJob(job.id,"loopOnP2SHV2 end:"+index,amount);
     return true;
