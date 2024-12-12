@@ -469,7 +469,7 @@ class Wallet {
                     "index": 0
                 },
                 "scriptPublicKey": "0000" + tx.inputs[0].utxo.scriptPublicKey.script,
-                "blockDaaScore": tx[0].blockDaaScore,
+                "blockDaaScore": tx.inputs[0].utxo.blockDaaScore,
                 "isCoinbase": false
             }
 
