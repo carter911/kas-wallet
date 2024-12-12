@@ -460,7 +460,7 @@ class Wallet {
             }
 
 
-            let publicKey = tx.inputs[0].utxo.scriptPublicKey.script;
+            let publicKey = "0000"+tx.inputs[0].utxo.scriptPublicKey.script;
             if(this.network != "mainnet"){
                  publicKey = "0000" +tx.inputs[0].utxo.scriptPublicKey.script;
             }
