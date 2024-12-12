@@ -81,7 +81,7 @@ export async function balance(req: Request, res: Response): Promise<void> {
         //         ticks[index].balance = parseAmount(tick.balance.toString(),tick.dec)
         //     });
         // }
-        res.status(200).json({balance:balance,ticks:ticks});
+        res.status(200).json({address:address,balance:balance,ticks:ticks});
     } catch (error: any) {
         res.status(500).json({error: error.message});
     }
@@ -192,6 +192,64 @@ export async function market(req: Request, res: Response): Promise<void> {
             }
         });
         const transactionId = await wallet.market(ticker.toString(),sendAmount.toString(),gasFee);
+        res.status(200).json({transactionId:transactionId});
+    } catch (error: any) {
+        res.status(503).json({ error: error.message });
+    }
+}
+
+export async function buy(req: Request, res: Response): Promise<void> {
+    const {privateKey,data } = req.body;
+    console.log(data);
+    if (!privateKey) {
+        console.warn('privateKey is undefined, using default network.');
+        res.status(401).json({ error: 'privateKey is undefined, using default network.' });
+    }
+    if (!data) {
+        console.warn('amount is undefined, using default network.');
+        res.status(401).json({ error: 'amount is undefined, using default network.' });
+    }
+    try {
+        const connection = await req.pool.getConnection();
+        const wallet = new Wallet(privateKey.toString(),connection);
+        const transactionId = await wallet.pskt(data);
+        res.status(200).json({transactionId:transactionId});
+    } catch (error: any) {
+        res.status(503).json({ error: error.message });
+    }
+}
+
+export async function sell(req: Request, res: Response): Promise<void> {
+    const {privateKey,ticker,amount,gasFee,tickAmount } = req.body;
+    if (!privateKey) {
+        console.warn('privateKey is undefined, using default network.');
+        res.status(401).json({ error: 'privateKey is undefined, using default network.' });
+    }
+    if (!amount) {
+        console.warn('amount is undefined, using default network.');
+        res.status(401).json({ error: 'amount is undefined, using default network.' });
+    }
+    if (!tickAmount) {
+        console.warn('tickAmount is undefined, using default network.');
+        res.status(401).json({ error: 'tickAmount is undefined' });
+    }
+
+    if (!ticker) {
+        console.warn('ticker is undefined, using default network.');
+        res.status(401).json({ error: 'ticker is undefined, using default network.' });
+    }
+
+    try {
+        const connection = await req.pool.getConnection();
+        const wallet = new Wallet(privateKey.toString(),connection);
+        const sendAmount = tickAmount*100000000;
+        const sendAddress = wallet.getAddress();
+        await new Krc().getTickList(sendAddress).then((info)=>{
+            if(info.balance<sendAmount){
+                throw new Error("Insufficient balance");
+            }
+        });
+        const transactionId = await wallet.sell(ticker.toString(),sendAmount.toString(),amount,gasFee);
         res.status(200).json({transactionId:transactionId});
     } catch (error: any) {
         res.status(503).json({ error: error.message });

@@ -9,11 +9,11 @@ import {
     createInputSignature,
     SighashType,
     Opcodes,
-    addressFromScriptPublicKey
+    addressFromScriptPublicKey, Transaction
 } from '../Library/wasm/kaspa';
 import RpcConnection from './RpcConnection';
 type ItemType = {
-    address: string;
+    address:string,
     script: ScriptBuilder;
     publicKey: string;
 };
@@ -203,15 +203,15 @@ class Wallet {
         return {p:'krc-20',op:"list",tick:ticket.toLocaleUpperCase(),amt:amt};
     }
 
-    public sendOP(){
-        return {p:'krc-20',op:"send"};
+    public sendOP(ticket:string){
+        return {p:'krc-20',op:"send",tick:ticket.toLocaleUpperCase()};
     }
 
 
     public makeP2shAddress(privateKeyString:String,data:any):ItemType{
         const privateKey = new PrivateKey(privateKeyString.toString());
         const publicKey = privateKey.toPublicKey();
-        const script = new ScriptBuilder()
+        const script:ScriptBuilder = new ScriptBuilder()
             .addData(publicKey.toXOnlyPublicKey().toString())
             .addOp(Opcodes.OpCheckSig)
             .addOp(Opcodes.OpFalse)
@@ -336,7 +336,7 @@ class Wallet {
             await RPC.unsubscribeUtxosChanged([P2SHAddress.address.toString()]);
 
             //reveal
-            const SendP2SHAddress = this.makeP2shAddress(this.privateKeyObj.toString(),this.sendOP());
+            const SendP2SHAddress = this.makeP2shAddress(this.privateKeyObj.toString(),this.sendOP(tick));
             await RPC.subscribeUtxosChanged([SendP2SHAddress.address.toString()]);
             const revealTransactionId = await this.retryRequest(async () => {
                 return await this.reveal(P2SHAddress.address, 3-gasFee, gasFee, P2SHAddress.script,SendP2SHAddress.address);
@@ -352,18 +352,180 @@ class Wallet {
         }
     }
 
-    public async deploy(tick:string,max:string,lim:string,to:string,gasFee:number,dec:string="8"):Promise<{transactionId:string,revealTransactionId:string}>{
+    public async sell(tick:string,tickAmount:string,amount:string,gasFee:number):Promise<{transactionId:string,revealTransactionId:string,tx:any}>{
         try {
-            const data = this.deployOP(tick,max,lim,to,dec);
-            const P2SHAddress = this.makeP2shAddress(this.privateKeyObj.toString(),data);
-            const transactionId = await this.send(P2SHAddress.address, 3, gasFee);
-            const address = await this.getAddress();
-            const revealTransactionId = await this.reveal(P2SHAddress.address, 3-gasFee, gasFee,P2SHAddress.script, address);
-            return {transactionId:transactionId.toString(),revealTransactionId:revealTransactionId!.toString()};
+
+            const P2SHAddress = this.makeP2shAddress(this.privateKeyObj.toString(),this.listOP(tick,tickAmount));
+            const RPC = await this.RpcConnection.getRpcClient();
+            await RPC.subscribeUtxosChanged([P2SHAddress.address.toString()]);
+
+            if(!gasFee){
+                gasFee = 0.0002;
+            }
+            const transactionId = await this.retryRequest(async () => {
+                return await this.send(P2SHAddress.address.toString(), 3, gasFee);
+            }, MAX_RETRIES, "send transaction");
+            //const transactionId = await this.send(P2SHAddress.address, 3);
+            await this.RpcConnection.listenForUtxoChanges(P2SHAddress.address,transactionId.toString());
+            await RPC.unsubscribeUtxosChanged([P2SHAddress.address.toString()]);
+
+            //reveal
+            const SendP2SHAddress = this.makeP2shAddress(this.privateKeyObj.toString(),this.sendOP(tick));
+            await RPC.subscribeUtxosChanged([SendP2SHAddress.address.toString()]);
+            const revealTransactionId = await this.retryRequest(async () => {
+                return await this.reveal(P2SHAddress.address, 3-gasFee, gasFee, P2SHAddress.script,SendP2SHAddress.address);
+            }, MAX_RETRIES, "reveal transaction");
+            if(revealTransactionId){
+                await this.RpcConnection.listenForUtxoChanges(SendP2SHAddress.address,revealTransactionId.toString());
+            }
+            await RPC.unsubscribeUtxosChanged([SendP2SHAddress.address.toString()]);
+            const tx:any = await this.txSign(this.sendOP(tick),revealTransactionId!.toString(),BigInt(amount));
+
+            console.log('----------------->',tx);
+            return {tx:tx.toString(),transactionId:transactionId!.toString(),revealTransactionId:revealTransactionId!.toString()};
+
         }catch (e) {
             console.log(e);
-            return {transactionId:'',revealTransactionId:''};
+            return {tx:"",transactionId:'',revealTransactionId:''};
         }
     }
+
+    public async txSign(data: Object, hash: string, amount: bigint) {
+        console.log(amount);
+        //const u64MaxValue = 18446744073709551615;
+        const privateKey = this.privateKeyObj;
+        const publicKey = privateKey.toPublicKey();
+        const address = publicKey.toAddress(this.network);
+        const script = new ScriptBuilder()
+            .addData(privateKey.toPublicKey().toXOnlyPublicKey().toString())
+            .addOp(Opcodes.OpCheckSig)
+            .addOp(Opcodes.OpFalse)
+            .addOp(Opcodes.OpIf)
+            .addData(Buffer.from("kasplex"))
+            .addI64(0n)
+            .addData(Buffer.from(JSON.stringify(data, null, 0)))
+            .addOp(Opcodes.OpEndIf);
+        let scriptPublicKey = script.createPayToScriptHashScript()
+        const P2SHAddress = addressFromScriptPublicKey(scriptPublicKey, this.network)!;
+
+        const RPC = await this.RpcConnection.getRpcClient();
+
+        const {entries} = await RPC.getUtxosByAddresses({addresses: [P2SHAddress.toString()]});
+
+        let entry:any = [];
+        let enterAmount = 0n
+        for (var item of entries) {
+            if (item.outpoint.transactionId == hash) {
+                enterAmount = item.amount
+                console.log('enterAmount', enterAmount)
+                console.log('entry', item.entry);
+                entry = item.entry;
+                break
+            }
+        }
+        let output = [{
+            address: address.toString(),
+            amount: kaspaToSompi(amount.toString())!,
+        }];
+        const tx:Transaction = createTransaction([entry], output, 0n, "", 1);
+        console.log(tx.outputs);
+        let signature = createInputSignature(tx, 0, privateKey, SighashType.SingleAnyOneCanPay);
+        tx.inputs[0].signatureScript = script.encodePayToScriptHashSignatureScript(signature)
+        return tx.serializeToSafeJSON();
+    }
+
+
+    public async pskt(data: string) {
+        const privateKey = this.privateKeyObj;
+        const publicKey = privateKey.toPublicKey();
+        const address = publicKey.toAddress(this.network);
+        const RPC = await this.RpcConnection.getRpcClient();
+        try {
+            //sell tx
+            let tx:Transaction = Transaction.deserializeFromSafeJSON(data);
+            console.log(tx.inputs[0].utxo);
+            const {entries} = await RPC.getUtxosByAddresses({addresses: [address.toString()]});
+            let total:bigint = entries.reduce((agg, curr) => {
+                return curr.amount + agg;
+            }, 0n);
+
+            if(tx.inputs.length<1
+                || tx.inputs[0].utxo === undefined
+                || tx.inputs[0].utxo.outpoint === undefined
+                || tx.inputs[0].utxo.outpoint.transactionId === undefined
+                || tx.inputs[0].utxo.address === undefined
+                || tx.inputs[0].utxo.amount === undefined
+                || tx.inputs[0].utxo.scriptPublicKey === undefined){
+                console.log('tx.inputs.length<1');
+                return  false;
+            }
+
+
+            let entry:any = {
+                "address": tx.inputs[0].utxo.address.toString(),
+                "amount": tx.inputs[0].utxo.amount,
+                "outpoint": {
+                    "transactionId": tx.inputs[0].utxo.outpoint.transactionId,
+                    "index": 0
+                },
+                "scriptPublicKey": "0000" + tx.inputs[0].utxo.scriptPublicKey.script,
+                "blockDaaScore": entries[0].blockDaaScore,
+                "isCoinbase": false
+            }
+
+            entries.unshift(entry);
+            console.log(entries);
+
+            if (entries.length === 0) {
+                console.log('entries.length === 0');
+                return;
+            }
+            let outputs:IPaymentOutput[] = [{
+                address: "kaspatest:qpp2xdfehz4jya6pu5uq0vghvsf8g4xsa9hq4ua40lgfaktjdxhxgzylhyr9t",
+                amount: tx.outputs[0].value!
+            }];
+
+            console.log(total-tx.outputs[0].value!);
+            outputs.push({
+                address: address.toString(),
+                amount: total-tx.outputs[0].value!
+            });
+            console.log(outputs);
+
+            const {transactions, summary} = await createTransactions({
+                priorityEntries: entries,
+                entries: entries,
+                outputs: outputs,
+                changeAddress: address.toString(),
+                priorityFee: 1n,
+                networkId: this.network
+            });
+            for (const transaction of transactions) {
+
+                transaction.fillInput(0, tx.inputs[0].signatureScript);
+                transaction.sign([privateKey], false);
+                await transaction.submit(RPC);
+            }
+
+            return summary.finalTransactionId
+        } catch (error) {
+            console.log(error);
+            return error
+        }
+    }
+    //
+    // public async deploy(tick:string,max:string,lim:string,to:string,gasFee:number,dec:string="8"):Promise<{transactionId:string,revealTransactionId:string}>{
+    //     try {
+    //         const data = this.deployOP(tick,max,lim,to,dec);
+    //         const P2SHAddress = this.makeP2shAddress(this.privateKeyObj.toString(),data);
+    //         const transactionId = await this.send(P2SHAddress.address, 3, gasFee);
+    //         const address = await this.getAddress();
+    //         const revealTransactionId = await this.reveal(P2SHAddress.address, 3-gasFee, gasFee,P2SHAddress.script, address);
+    //         return {transactionId:transactionId.toString(),revealTransactionId:revealTransactionId!.toString()};
+    //     }catch (e) {
+    //         console.log(e);
+    //         return {transactionId:'',revealTransactionId:''};
+    //     }
+    //}
 }
 export default Wallet;
