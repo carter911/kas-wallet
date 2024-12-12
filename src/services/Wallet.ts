@@ -12,6 +12,7 @@ import {
     addressFromScriptPublicKey, Transaction
 } from '../Library/wasm/kaspa';
 import RpcConnection from './RpcConnection';
+import {publickey_toAddress, publickey_toString} from "../Library/wasm/kaspa/kaspa_bg.wasm";
 type ItemType = {
     address:string,
     script: ScriptBuilder;
@@ -464,6 +465,7 @@ class Wallet {
             if(this.network != "mainnet"){
                  publicKey = "0000" +tx.inputs[0].utxo.scriptPublicKey.script;
             }
+
             let entry:any = {
                 "address": tx.inputs[0].utxo.address.toString(),
                 "amount": BigInt(tx.inputs[0].utxo.amount.toString())!,
@@ -485,8 +487,10 @@ class Wallet {
                 return;
             }
             let Sompiamount =  BigInt(tx.outputs[0].value);
+
+            let sellAddress = tx.inputs[0].utxo.address;
             let outputs:IPaymentOutput[] = [{
-                address: "kaspatest:qpp2xdfehz4jya6pu5uq0vghvsf8g4xsa9hq4ua40lgfaktjdxhxgzylhyr9t",
+                address: sellAddress.toString(),
                 amount: Sompiamount!
             }];
 
