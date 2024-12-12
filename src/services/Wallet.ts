@@ -469,9 +469,10 @@ class Wallet {
                     "index": 0
                 },
                 "scriptPublicKey": "0000" + tx.inputs[0].utxo.scriptPublicKey.script,
-                "blockDaaScore": entries[0].blockDaaScore,
+                "blockDaaScore": tx[0].blockDaaScore,
                 "isCoinbase": false
             }
+
 
             entries.unshift(entry);
             console.log(entries);
