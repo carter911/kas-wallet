@@ -501,6 +501,7 @@ class Wallet {
                 priorityEntries: entries,
                 entries: entries,
                 outputs: outputs,
+                priorityFee: kaspaToSompi("0.0002")!,
                 changeAddress: address.toString(),
                 networkId: this.network
             });
