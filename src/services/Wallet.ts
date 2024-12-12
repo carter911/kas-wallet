@@ -493,7 +493,7 @@ class Wallet {
             console.log('-------->',total-BigInt(tx.outputs[0].value)!);
             outputs.push({
                 address: address.toString(),
-                amount: total-Sompiamount!
+                amount: total-Sompiamount!-kaspaToSompi("0.0002")!
             });
             console.log(outputs);
 
@@ -502,7 +502,6 @@ class Wallet {
                 entries: entries,
                 outputs: outputs,
                 changeAddress: address.toString(),
-                priorityFee: 1n,
                 networkId: this.network
             });
             for (const transaction of transactions) {
