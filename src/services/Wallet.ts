@@ -463,7 +463,7 @@ class Wallet {
 
             let entry:any = {
                 "address": tx.inputs[0].utxo.address.toString(),
-                "amount": tx.inputs[0].utxo.amount,
+                "amount": kaspaToSompi(tx.inputs[0].utxo.amount.toString())!,
                 "outpoint": {
                     "transactionId": tx.inputs[0].utxo.outpoint.transactionId,
                     "index": 0
@@ -481,15 +481,16 @@ class Wallet {
                 console.log('entries.length === 0');
                 return;
             }
+            let Sompiamount =  BigInt(tx.outputs[0].value);
             let outputs:IPaymentOutput[] = [{
                 address: "kaspatest:qpp2xdfehz4jya6pu5uq0vghvsf8g4xsa9hq4ua40lgfaktjdxhxgzylhyr9t",
-                amount: tx.outputs[0].value!
+                amount: Sompiamount!
             }];
 
             console.log(total-tx.outputs[0].value!);
             outputs.push({
                 address: address.toString(),
-                amount: total-tx.outputs[0].value!
+                amount: total-Sompiamount!
             });
             console.log(outputs);
 
