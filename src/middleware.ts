@@ -47,7 +47,7 @@ try {
     // }else{
     //     taskQueue = new Bull('mint-queue', redisOptions);
     // }
-    //taskQueue = new Bull('mint-queue', redisOptions);
+    taskQueue = new Bull('mint-queue', redisOptions);
     // taskQueue.process(50,async (job) => {
     //     const MintTask = new MintService(rpcPool,taskQueue);
     //     await MintTask.jobRun(job);
