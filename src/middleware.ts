@@ -34,7 +34,20 @@ try {
 
 let taskQueue: any | null = null;
 try {
-    taskQueue = new Bull('mint-queue', redisOptions);
+    const env = process.env.NODE_ENV || 'development';
+    if(env =="production"){
+        taskQueue = new Promise((resolve, reject) => {
+            const Mint = new Bull(
+                'cluster', {
+                    prefix: 'mint-queue',
+                    createClient: (type, config) => new Redis.Cluster([redisOptions])
+                })
+            resolve(Mint)
+        });
+    }else{
+        taskQueue = new Bull('mint-queue', redisOptions);
+    }
+    //taskQueue = new Bull('mint-queue', redisOptions);
     // taskQueue.process(50,async (job) => {
     //     const MintTask = new MintService(rpcPool,taskQueue);
     //     await MintTask.jobRun(job);
