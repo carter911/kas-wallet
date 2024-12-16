@@ -12,6 +12,7 @@ import {
     addressFromScriptPublicKey, Transaction
 } from '../Library/wasm/kaspa';
 import RpcConnection from './RpcConnection';
+import {parseAmount} from "./Misc";
 type ItemType = {
     address:string,
     script: ScriptBuilder;
@@ -88,7 +89,7 @@ class Wallet {
     }
 
     // Send KAS
-    async send(toAddress: string, amount: number, gasFee: number=0.00000) {
+    async send(toAddress: string, amount: number, gasFee: number=0.00002) {
         const RPC = await this.RpcConnection.getRpcClient();
         const address = this.getAddress();
         const UTXO = await RPC.getUtxosByAddresses({ addresses: [address.toString()] });
@@ -195,16 +196,19 @@ class Wallet {
         return {p: 'krc-20', op: 'transfer', tick: ticker.toLocaleUpperCase(), amt: amt, to: address.toString(),};
     }
 
-    public deployOP(ticket:string,max:string,lim:string,to?:string,dec:string="8",pre?:string){
-        return {p: "krc-20",op: "deploy",tick: ticket,max: max,lim:lim,to:to,dec: dec,pre: pre};
+    public deployOP(ticket:string,max:string,lim:string,to?:string,dec:string="8",pre:string="0"){
+        let maxString = parseAmount(max,parseInt(dec));
+        let limString = parseAmount(lim,parseInt(dec));
+        let preString = parseAmount(pre,parseInt(dec));
+        return {p: "krc-20",op: "deploy",tick: ticket,max: maxString,lim:limString,to:to,dec: dec,pre: preString};
     }
 
     public listOP(ticket:string,amt:string){
-        return {p:'krc-20',op:"list",tick:ticket.toLocaleUpperCase(),amt:amt};
+        return {p:'krc-20',op:"list",tick:ticket.toLocaleLowerCase(),amt:amt.toString()};
     }
 
     public sendOP(ticket:string){
-        return {p:'krc-20',op:"send",tick:ticket.toLocaleUpperCase()};
+        return {p:'krc-20',op:"send",tick:ticket.toLocaleLowerCase()};
     }
 
 
@@ -225,6 +229,30 @@ class Wallet {
             address:P2SHAddress!.toString(),
             script:script,
             publicKey:publicKey.toString()
+        }
+    }
+
+    public async deploy(tick:string,max:string,lim:string,pre:string,dec?:string):Promise<{transactionId:string,revealTransactionId:string}>{
+        try {
+            const RPC = await this.RpcConnection.getRpcClient();
+            const MAX_RETRIES = 20; // 最大重试次数
+            const address = this.getAddress();
+            const data = this.deployOP(tick,max,lim,address.toString(),dec,pre);
+            const P2SHAddress = this.makeP2shAddress(this.privateKeyObj.toString(),data);
+            await RPC.subscribeUtxosChanged([P2SHAddress.address.toString()]);
+            const transactionId = await this.send(P2SHAddress.address, 1002.9);
+            console.log(transactionId)
+            await this.RpcConnection.listenForUtxoChanges(P2SHAddress.address,transactionId.toString());
+            await this.sleep(3);
+
+            const revealTransactionId = await this.retryRequest(async () => {
+                return await this.reveal(P2SHAddress.address, 2.9, 1000, P2SHAddress.script,address);
+            }, MAX_RETRIES, "reveal transaction");
+            console.log(revealTransactionId)
+            return {transactionId:transactionId.toString(),revealTransactionId:revealTransactionId!.toString()};
+        }catch (e) {
+            console.log(e);
+            return {transactionId:'',revealTransactionId:''};
         }
     }
 
@@ -435,7 +463,7 @@ class Wallet {
     }
 
 
-    public async pskt(data: string) {
+    public async buy(data: string) {
         const privateKey = this.privateKeyObj;
         const publicKey = privateKey.toPublicKey();
         const address = publicKey.toAddress(this.network);

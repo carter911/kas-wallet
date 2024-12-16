@@ -1,6 +1,6 @@
 import express from 'express';
 import { submitForm, getStatus, cancel } from '../controllers/taskControoler';
-import { balance, generateAddress, importAddress,importByPrivateKey, send, transfer,market,sell,buy } from '../controllers/walletControoler';
+import { balance, generateAddress, importAddress,importByPrivateKey, send, transfer,market,sell,buy,sellCancel,deploy } from '../controllers/walletControoler';
 
 const router = express.Router();
 
@@ -13,10 +13,12 @@ router.post('/wallet/import', importAddress);
 router.post('/wallet/import_privateKey', importByPrivateKey);
 router.post('/wallet/balance', balance);
 router.post('/wallet/send', send);
+router.post('/wallet/deploy', deploy);
 router.post('/wallet/transfer', transfer);
 router.post('/wallet/market', market);
 
 router.post('/wallet/sell', sell);
+router.post('/wallet/sell_cancel', sellCancel);
 
 router.post('/wallet/buy', buy);
 export default router;

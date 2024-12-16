@@ -123,6 +123,46 @@ export async function send(req: Request, res: Response): Promise<void> {
 }
 
 
+export async function deploy(req: Request, res: Response): Promise<void> {
+    const {privateKey, ticker,max,lim,pre } = req.body;
+    if (!privateKey) {
+        console.warn('privateKey is undefined, using default network.');
+        res.status(401).json({ error: 'privateKey is undefined, using default network.' });
+        return ;
+    }
+    if (!ticker) {
+        console.warn('ticker is undefined, using default network.');
+        res.status(401).json({ error: 'ticker is undefined, using default network.' });
+        return ;
+    }
+    if(!lim){
+        res.status(401).json({ error: 'lim is undefined' });
+        return ;
+    }
+    if(!max){
+        res.status(401).json({ error: 'max is undefined' });
+        return ;
+    }
+    if(!pre){
+        res.status(401).json({ error: 'max is undefined' });
+        return ;
+    }
+    try {
+        const connection = await req.pool.getConnection();
+        const wallet = new Wallet(privateKey.toString(),connection);
+        let balance = await wallet.getBalance();
+        let balanceNum = Number(balance.replace(/,/g, ""));
+        if(balanceNum<=1003){
+            throw new Error("Insufficient balance");
+        }
+        const transactionId = await wallet.deploy(ticker.toString(),max,lim,pre);
+        res.status(200).json({transactionId:transactionId});
+    } catch (error: any) {
+        res.status(503).json({ error: error.message });
+    }
+}
+
+
 export async function transfer(req: Request, res: Response): Promise<void> {
     const {privateKey, address,ticker,amount,gasFee } = req.body;
     if (!privateKey) {
@@ -147,8 +187,8 @@ export async function transfer(req: Request, res: Response): Promise<void> {
 
         const sendAddress = wallet.getAddress();
         let sendAmount:string = "";
-            await new Krc().getTickBalance(sendAddress,ticker).then((info)=>{
-                console.log(info.balance.toString(),info.dec);
+        await new Krc().getTickBalance(sendAddress,ticker).then((info)=>{
+            console.log(info.balance.toString(),info.dec);
             let balance = parseAmount(info.balance.toString(),info.dec)
             if(balance<amount){
                 throw new Error("Insufficient balance");
@@ -165,6 +205,7 @@ export async function transfer(req: Request, res: Response): Promise<void> {
         res.status(503).json({ error: error.message });
     }
 }
+
 
 
 export async function market(req: Request, res: Response): Promise<void> {
@@ -212,12 +253,33 @@ export async function buy(req: Request, res: Response): Promise<void> {
     try {
         const connection = await req.pool.getConnection();
         const wallet = new Wallet(privateKey.toString(),connection);
-        const transactionId = await wallet.pskt(data);
+        const transactionId = await wallet.buy(data);
         res.status(200).json({transactionId:transactionId});
     } catch (error: any) {
         res.status(503).json({ error: error.message });
     }
 }
+export async function sellCancel(req: Request, res: Response): Promise<void> {
+    const {privateKey,data } = req.body;
+    console.log(data);
+    if (!privateKey) {
+        console.warn('privateKey is undefined, using default network.');
+        res.status(401).json({ error: 'privateKey is undefined, using default network.' });
+    }
+    if (!data) {
+        console.warn('amount is undefined, using default network.');
+        res.status(401).json({ error: 'amount is undefined, using default network.' });
+    }
+    try {
+        const connection = await req.pool.getConnection();
+        const wallet = new Wallet(privateKey.toString(),connection);
+        const transactionId = await wallet.buy(data);
+        res.status(200).json({transactionId:transactionId});
+    } catch (error: any) {
+        res.status(503).json({ error: error.message });
+    }
+}
+
 
 export async function sell(req: Request, res: Response): Promise<void> {
     const {privateKey,ticker,amount,gasFee,tickAmount } = req.body;
