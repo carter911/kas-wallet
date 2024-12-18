@@ -12,7 +12,7 @@ import {
     addressFromScriptPublicKey, Transaction
 } from '../Library/wasm/kaspa';
 import RpcConnection from './RpcConnection';
-import {parseAmount} from "./Misc";
+import {formatAmount} from "./Misc";
 type ItemType = {
     address:string,
     script: ScriptBuilder;
@@ -197,9 +197,9 @@ class Wallet {
     }
 
     public deployOP(ticket:string,max:string,lim:string,to?:string,dec:string="8",pre:string="0"){
-        let maxString = parseAmount(max,parseInt(dec));
-        let limString = parseAmount(lim,parseInt(dec));
-        let preString = parseAmount(pre,parseInt(dec));
+        let maxString = formatAmount(max,parseInt(dec));
+        let limString = formatAmount(lim,parseInt(dec));
+        let preString = formatAmount(pre,parseInt(dec));
         return {p: "krc-20",op: "deploy",tick: ticket,max: maxString,lim:limString,to:to,dec: dec,pre: preString};
     }
 

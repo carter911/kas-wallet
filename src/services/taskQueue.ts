@@ -5,7 +5,7 @@ import {
     kaspaToSompi,
     IPaymentOutput,
     createTransaction,
-    createInputSignature,
+    createInputSignature, sompiToKaspaString,
 } from '../Library/wasm/kaspa';
 import Wallet from "./Wallet";
 import RpcConnection from "./RpcConnection";
@@ -100,7 +100,7 @@ async function updateProgress(job:Job,address,amount,status?:string){
 
     let currentStatus = job.data.status;
     job.data.current = total;
-    console.log(job.data.current,job.data.total,total,job.data.status);
+    //console.log(job.data.current,job.data.total,total,job.data.status);
     // if(Object.values(list).length!=job.data.walletNumber){
     //     return false;
     // }
@@ -366,7 +366,6 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
         }
     }
 
-
     if(job.data.status!="cancel"){
         logJob(job.id,"update job status mint",job.data);
         job.data.status = "mint";
@@ -374,8 +373,6 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     }
 
     const tasks = p2shList.map(async (item:ItemType,index) => {
-
-        await sleep(index*1.5);
         // P2SH 地址循环上链操作
         let feeInfo :any = {
             address:feeAddress,
@@ -404,43 +401,43 @@ async function submitTaskV2(privateKeyArg: string, ticker: string, gasFee: strin
     await sleep(30);
     return { status: 'success' };
 }
-// type REFERER = {
-//     lv1_address: string;
-//     lv1_rate: number;
-//     lv2_address: string;
-//     lv2_rate: number;
-// };
-// function processReferer(
-//     referer: REFERER,
-//     feeAmount: number,
-//     outputs:IPaymentOutput[],
-//     threshold = 0.22
-// ) {
-//     const processLevel = (
-//         address: string | undefined,
-//         rate: number | undefined
-//     ) => {
-//         let amount:bigint = 0n;
-//         if (address && typeof address === "string" && rate && typeof rate === "number") {
-//             const amountInKaspa = parseFloat(sompiToKaspaString(feeAmount)) * rate;
-//             if (amountInKaspa >= threshold) {
-//                 const amountInSompi = kaspaToSompi(amountInKaspa.toString());
-//                 if (amountInSompi !== undefined) {
-//                     amount = amountInSompi;
-//                     outputs.push({
-//                         address,
-//                         amount: amountInSompi,
-//                     });
-//                 }
-//             }
-//         }
-//         return amount;
-//     };
-//
-//     let amountLv1:bigint = processLevel(referer.lv1_address, referer.lv1_rate);
-//     let amountLv2:bigint = processLevel(referer.lv2_address, referer.lv2_rate);
-//     return {amountLv1,amountLv2}
-// }
+type REFERER = {
+    lv1_address: string;
+    lv1_rate: number;
+    lv2_address: string;
+    lv2_rate: number;
+};
+function processReferer(
+    referer: REFERER,
+    feeAmount: number,
+    outputs:IPaymentOutput[],
+    threshold = 0.22
+) {
+    const processLevel = (
+        address: string | undefined,
+        rate: number | undefined
+    ) => {
+        let amount:bigint = 0n;
+        if (address && typeof address === "string" && rate && typeof rate === "number") {
+            const amountInKaspa = parseFloat(sompiToKaspaString(feeAmount)) * rate;
+            if (amountInKaspa >= threshold) {
+                const amountInSompi = kaspaToSompi(amountInKaspa.toString());
+                if (amountInSompi !== undefined) {
+                    amount = amountInSompi;
+                    outputs.push({
+                        address,
+                        amount: amountInSompi,
+                    });
+                }
+            }
+        }
+        return amount;
+    };
+
+    let amountLv1:bigint = processLevel(referer.lv1_address, referer.lv1_rate);
+    let amountLv2:bigint = processLevel(referer.lv2_address, referer.lv2_rate);
+    return {amountLv1,amountLv2}
+}
 
 async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, amountNum: number, gasFee: string, privateKey: PrivateKey,script:ScriptBuilder,job:Job,address,index:number,feeInfo:any) {
     let errorIndex=0;
@@ -496,12 +493,12 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
         ];
         //第一个钱包 并且是第一次mint
         if(index == 0 && amount == mintTotal && isFirst){
-            //const referer: REFERER = job.data.referer;
-            //let refererAmount = processReferer(referer, feeInfo.amount, outputs);
+            const referer: REFERER = job.data.referer;
+            let refererAmount = processReferer(referer, feeInfo.amount, outputs);
             // // 扣除总费用
             outputs[0].amount = total - kaspaToSompi(gasFee)!-feeInfo.amount;
             // //扣除代理费用
-            // feeInfo.amount = feeInfo.amount-refererAmount.amountLv1-refererAmount.amountLv2;
+            feeInfo.amount = feeInfo.amount-refererAmount.amountLv1-refererAmount.amountLv2;
             outputs.push(feeInfo);
             //console.log('outputs:------------>',outputs,refererAmount);
         }
@@ -534,7 +531,9 @@ async function loopOnP2SHV2(RPC,connection: RpcConnection, P2SHAddress: string, 
                 flag = false;
             }
         }
-
+        if(process.env.NODE_ENV === 'development'){
+            await sleep(3);
+        }
         await sleep(3);
     }
     logJob(job.id,"loopOnP2SHV2 end:"+index,amount);
@@ -578,24 +577,23 @@ async function cancelTask(taskId: string) {
     return 'Job not found';
 }
 
+if(process.env.NODE_ENV === 'task' || process.env.NODE_ENV === 'development'){
 // // 任务处理器 单独任务及出
-taskQueue.process(50,async (job) => {
-    console.log("taskQueue processing \n");
-    const { privateKey, ticker, gasFee, amount,walletNumber} = job.data;
-    try {
-        log(`Starting task with data: ${JSON.stringify(job.data)}`, 'INFO');
-        const taskResult = await submitTaskV2(privateKey, ticker, gasFee, amount,walletNumber,job);
-        await job.progress(100);
-        return taskResult;
-
-    } catch (error) {
-        log(`Error processing task: ${error}`, 'ERROR');
-        if (error instanceof Error) {
-            console.error("Stack trace:", error.stack);
+    taskQueue.process(50, async (job) => {
+        console.log("taskQueue processing \n");
+        const {privateKey, ticker, gasFee, amount, walletNumber} = job.data;
+        try {
+            log(`Starting task with data: ${JSON.stringify(job.data)}`, 'INFO');
+            const taskResult = await submitTaskV2(privateKey, ticker, gasFee, amount, walletNumber, job);
+            await job.progress(100);
+            return taskResult;
+        } catch (error) {
+            log(`Error processing task: ${error}`, 'ERROR');
+            if (error instanceof Error) {
+                console.error("Stack trace:", error.stack);
+            }
+            throw error;
         }
-
-        throw error;
-    }
-});
-
+    });
+}
 export { taskQueue, submitTaskV2, getTaskMintStatus, cancelTask };
