@@ -54,6 +54,22 @@ export async function importByPrivateKey(req: Request, res: Response): Promise<v
     }
 }
 
+export async function feeEstimation(req: Request, res: Response): Promise<void> {
+
+    try {
+        const connection = await req.pool.getConnection();
+        const RPC = await connection.getRpcClient();
+        const request = {
+            numInputs: 1,     // 输入数量
+            numOutputs: 1     // 输出数量
+        };
+        const fee = await RPC.getFeeEstimate(request);
+        res.status(200).json(fee?.estimate);
+    } catch (error: any) {
+        res.status(500).json({error: error.message});
+    }
+}
+
 export async function balance(req: Request, res: Response): Promise<void> {
     const { privateKey } = req.body;
     if (!privateKey) {

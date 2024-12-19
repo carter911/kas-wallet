@@ -111,10 +111,12 @@ class Wallet {
             networkId: this.network,
         });
 
-
+        //console.log(sompiToKaspaString(summary.fees),summary);
+        //console.log(await this.feeEstimation(UTXO.entries.length,outputs.length));
         let hash: any;
         for (const transaction of transactions) {
             transaction.sign([this.privateKeyObj], false);
+
             hash = await transaction.submit(RPC).catch((e:any)=>{
                 console.log(e);
             });
