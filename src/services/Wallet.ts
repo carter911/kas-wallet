@@ -455,7 +455,7 @@ class Wallet {
         }
         let output = [{
             address: address.toString(),
-            amount: kaspaToSompi(amount.toString())!,
+            amount: kaspaToSompi(amount.toString())!+enterAmount,
         }];
         const tx:Transaction = createTransaction([entry], output, 0n, "", 1);
         let signature = createInputSignature(tx, 0, privateKey, SighashType.SingleAnyOneCanPay);
